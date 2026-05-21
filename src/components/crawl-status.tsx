@@ -59,6 +59,23 @@ export function CrawlStatus() {
 		}
 	};
 
+	const recompute = async () => {
+		setStarting(true);
+		setError(null);
+		try {
+			const res = await fetch("/api/crawl/recompute", { method: "POST" });
+			if (!res.ok) {
+				const t = await res.text();
+				throw new Error(t);
+			}
+			await fetchStatus();
+		} catch (e) {
+			setError(e instanceof Error ? e.message : "recompute failed");
+		} finally {
+			setStarting(false);
+		}
+	};
+
 	const running = latest?.status === "running";
 	const done = latest?.status === "done";
 	const buttonLabel = running
@@ -123,6 +140,17 @@ export function CrawlStatus() {
 				<p className="rounded-md bg-destructive/10 p-2 text-xs text-destructive">
 					{error}
 				</p>
+			)}
+
+			{!running && (
+				<button
+					type="button"
+					onClick={recompute}
+					disabled={starting}
+					className="w-full rounded-md border border-white/15 bg-white/5 px-4 py-2 text-xs font-medium text-foreground/80 transition hover:bg-white/10 disabled:opacity-50"
+				>
+					Recompute layouts only (skip crawl)
+				</button>
 			)}
 
 			{done && (

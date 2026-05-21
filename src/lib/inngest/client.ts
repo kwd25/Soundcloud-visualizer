@@ -9,6 +9,13 @@ export interface CrawlRequestedEvent {
 	};
 }
 
+export interface LayoutsRequestedEvent {
+	name: "layouts/requested";
+	data: {
+		ownerUrn: string;
+	};
+}
+
 export const inngest = new Inngest({
 	id: "soundcloud-visualizer",
 });

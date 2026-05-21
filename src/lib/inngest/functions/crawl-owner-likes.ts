@@ -176,17 +176,17 @@ export const crawlOwnerLikes = inngest.createFunction(
 				return { count: coEdges.length };
 			});
 
-			// ── 4. LAYOUT — bipartite ──
+			// ── 4. LAYOUT — bipartite (degree≥3 to fit 60s budget) ──
 			const bipartiteResult = await step.run("layout-bipartite", async () => {
 				const graph = await buildGraphForOwner({
 					view: "bipartite",
 					ownerUrn,
-					minDegree: 2,
+					minDegree: 3,
 				});
 				if (graph.order === 0) return { nodes: 0, edges: 0 };
 
 				const { count, modularity } = assignCommunities(graph);
-				assignLayout(graph, 250);
+				assignLayout(graph, 150);
 				const rows = graphToLayoutRows(ownerUrn, "bipartite", graph);
 				await clearOwnerLayout(ownerUrn, "bipartite");
 				await insertLayout(rows);
