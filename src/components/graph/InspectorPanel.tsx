@@ -61,6 +61,18 @@ function SoundCloudWidget({ track }: { track: GraphNode }) {
 	);
 }
 
+/** Track title + SoundCloud widget — used per endpoint in the edge inspector. */
+function TrackBlock({ track }: { track: GraphNode }) {
+	return (
+		<div className="space-y-2">
+			<h3 className="break-words text-base font-semibold leading-tight">
+				{track.label ?? "(no title)"}
+			</h3>
+			<SoundCloudWidget track={track} />
+		</div>
+	);
+}
+
 function NodePanel({
 	node,
 	onClose,
@@ -184,13 +196,13 @@ function EdgePanel({
 
 			<div className="space-y-4 p-4">
 				{src.kind === "track" ? (
-					<SoundCloudWidget track={src} />
+					<TrackBlock track={src} />
 				) : (
 					<NodePreview node={src} />
 				)}
 				<div className="border-t border-dashed border-white/15" />
 				{dst.kind === "track" ? (
-					<SoundCloudWidget track={dst} />
+					<TrackBlock track={dst} />
 				) : (
 					<NodePreview node={dst} />
 				)}
