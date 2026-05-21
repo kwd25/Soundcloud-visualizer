@@ -1,0 +1,30 @@
+{
+	"permissions": {
+		"allow": [
+			"Bash(pnpm:*)",
+			"Bash(pnpm exec:*)",
+			"Bash(pnpm dlx:*)",
+			"Bash(pnpx:*)",
+			"Bash(npx:*)",
+			"Bash(node:*)",
+			"Bash(git status)",
+			"Bash(git diff:*)",
+			"Bash(git log:*)",
+			"Bash(git add:*)",
+			"Bash(git commit:*)",
+			"Bash(git push:*)",
+			"Bash(git pull:*)",
+			"Bash(git branch:*)",
+			"Bash(git checkout:*)",
+			"Bash(git stash:*)",
+			"Bash(gh:*)",
+			"Bash(mkdir:*)",
+			"Bash(touch:*)",
+			"Bash(ls:*)",
+			"Bash(cat:*)",
+			"Bash(rm:*)",
+			"Bash(mv:*)",
+			"Bash(cp:*)"
+		]
+	}
+}
