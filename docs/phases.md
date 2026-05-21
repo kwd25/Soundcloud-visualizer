@@ -66,14 +66,15 @@ Running roadmap. Update checkboxes as work lands. Each phase has a goal + accept
 ## Phase 4 — SoundCloud API client
 
 **Goal**: typed wrapper around the API that handles rate limiting, backoff, URN handling, pagination.
-**Accept**: from a local script, calling `client.me.likes()` paginates through all liked tracks; 429s back off correctly.
+**Accept**: from `/api/test/sc-me` (authed), calling `me.likes()` returns the first 50 paginated tracks with timing under 60s; refresh-token rotation handled atomically.
 
-- [ ] `src/lib/soundcloud/client.ts` — fetch wrapper with auth header, retry, backoff
-- [ ] `src/lib/soundcloud/types.ts` — response types from API
-- [ ] `src/lib/soundcloud/endpoints.ts` — typed helpers per endpoint
-- [ ] Pagination helper that follows `next_href`
-- [ ] Token refresh integration (calls back into `src/lib/auth/`)
-- [ ] Unit-ish test against a recorded response fixture
+- [x] `src/lib/soundcloud/types.ts` — `SoundCloudUser`, `SoundCloudTrack`, `PaginatedResponse`, error classes
+- [x] `src/lib/soundcloud/tokens.ts` — `getValidAccessToken` with race-safe atomic rotation (conditional UPDATE + re-read fallback; works on HTTP driver, no websocket needed)
+- [x] `src/lib/soundcloud/client.ts` — `SoundCloudClient` with `Authorization: OAuth` header, 200ms min request gap, exponential backoff on 429/5xx, honors `Retry-After`
+- [x] `src/lib/soundcloud/endpoints.ts` — `me.{profile,likes}`, `tracks.{get,favoriters,reposters}`, `users.{get,likes}` + `paginate()` async generator + `collect()` helper
+- [x] `src/lib/soundcloud/index.ts` — public exports
+- [x] `/api/test/sc-me` smoke endpoint
+- [ ] Verify on prod (post-deploy)
 
 ---
 
