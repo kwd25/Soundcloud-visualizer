@@ -50,8 +50,16 @@ Running roadmap. Update checkboxes as work lands. Each phase has a goal + accept
 - [x] Login button on landing page (server action calling `signIn("soundcloud")`)
 - [x] Protected route group `(authed)/` with layout-level `auth()` check + redirect
 - [x] `/dashboard` placeholder with username, avatar, URN, and logout
+- [x] Verified OAuth round-trip on prod: logged in as Swagfart (`soundcloud:users:188233718`), row created in `auth_users`, logout works
 - [ ] **Atomic refresh-token rotation** — deferred to Phase 4 (SoundCloud API client) where it actually matters. Needs `SELECT FOR UPDATE` which requires the WebSocket Neon driver, not HTTP.
-- [ ] Verify OAuth round-trip on prod (post-deploy)
+
+### Phase 3 lessons learned
+- **Vercel framework setting** — project must have `framework: "nextjs"` explicitly set. Marketplace integrations can leave it `null`, causing builds to use `@vercel/static-build` instead of `@vercel/next` (no serverless functions emitted, every dynamic route 404s with `x-vercel-error: NOT_FOUND`).
+- **Vercel "sensitive" env vars** — CLI-default `vercel env add` creates `sensitive` type vars (write-only via API/CLI). When pulled, they return empty strings, which broke our env validation. Use `--no-sensitive` for vars you want to inspect later.
+- **Next.js 16 `proxy.ts`** — re-exporting `auth` directly (`export const proxy = auth`) silently breaks Vercel deploys. If we ever add proxy logic, wrap it: `export const proxy = auth((req) => {...})`. For now we do auth checks in layouts via `await auth()`.
+- **SoundCloud token endpoint** — Auth.js defaults to HTTP Basic auth for client credentials, but SoundCloud requires `client_secret_post` (creds in form body). Wrote a custom `token.request` handler in the provider config.
+- **SoundCloud userinfo header** — uses `Authorization: OAuth <token>` not `Bearer`. Custom `userinfo.request` handler needed.
+- **Auth.js type augmentation** — must augment `@auth/core/types` and `@auth/core/jwt` directly, not just `next-auth` (which only re-exports).
 
 ---
 

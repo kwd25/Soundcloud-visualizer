@@ -49,7 +49,7 @@ pnpm db:studio     # open Drizzle Studio
 
 ## Current phase
 
-See `docs/phases.md`. Phases 1–3 complete (scaffold + Neon DB + SoundCloud OAuth). Phase 4 (typed SoundCloud API client with rate limiting + atomic token rotation) is next.
+See `docs/phases.md`. Phases 1–3 complete and verified end-to-end on prod (login flow works, user persisted to Neon, logout works). Phase 4 (typed SoundCloud API client with rate limiting + atomic token rotation) is next.
 
 ## Auth notes
 
