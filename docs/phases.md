@@ -105,7 +105,13 @@ Running roadmap. Update checkboxes as work lands. Each phase has a goal + accept
 - [x] `src/lib/graph/index.ts` — `computeLayoutAndCommunities` orchestrator
 - [x] `compute-layout` step added to crawl-owner-likes function (between expand loop and finalize)
 - [x] `GET /api/graph` — returns nodes (with x/y/community/metadata) + edges for the authed user
-- [ ] Verify on prod (post-deploy)
+- [x] Verified on prod: 9,207 nodes / 17 communities / modularity-meaningful clusters. Louvain identified scenes (slowed+reverb, DJ mixes, nightcore, hyperpop, sad, etc.) purely from co-listening. Compute-layout step finishes in ~10–15s after pruning to degree ≥ 2.
+
+### Phase 6 lessons learned
+- **`louvain.detailed()` does NOT assign** the community attribute — only `louvain.assign()` does. To get both modularity AND assignment, run `detailed()` then iterate `result.communities` and `setNodeAttribute()` yourself.
+- **75k-node graphs blow the 60s Vercel Hobby function timeout** in a single step.run(). Prune low-degree nodes (default minDegree=2) before layout — drops ~85% of nodes that are one-off favoriters and don't contribute to community structure.
+- **Set `maxDuration = 60`** explicitly on `/api/inngest/route.ts` so each step uses the full Hobby budget.
+- **Edges counter inflation**: `crawl_jobs.edges_discovered` tracks insert *attempts*, not successful inserts. ON CONFLICT DO NOTHING dedupes ~40% of attempts in practice. Real edge count is in the DB.
 
 ---
 

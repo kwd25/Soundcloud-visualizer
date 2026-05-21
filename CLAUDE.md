@@ -49,7 +49,7 @@ pnpm db:studio     # open Drizzle Studio
 
 ## Current phase
 
-See `docs/phases.md`. Phases 1–6 written; 1–5 verified on prod (first crawl: 8177 nodes / 8277 edges / 54s with seedCap=100, favoritersCap=100). Phase 6 (Louvain + ForceAtlas2 in a `compute-layout` step) is shipped, awaiting verification on prod after re-running the crawl with bumped caps (seedCap=500, favoritersCap=200). Phase 7 (sigma.js renderer consuming `/api/graph`) is next.
+See `docs/phases.md`. Phases 1–6 complete and verified on prod. Latest crawl (500 seeds × 200 favoriters): 9,207 nodes after pruning, 17 Louvain communities with clear thematic separation (slowed+reverb, nightcore, hyperpop, DJ mixes, etc.), ~278s end-to-end. Phase 7 (sigma.js WebGL renderer consuming `/api/graph`) is next.
 
 ## Auth notes
 
