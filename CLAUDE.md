@@ -49,4 +49,4 @@ pnpm db:studio     # open Drizzle Studio
 
 ## Current phase
 
-See `docs/phases.md`. As of skeleton scaffold: Phase 1 (foundation) complete; Phase 2 (database wiring) next.
+See `docs/phases.md`. Phase 1 + 2 complete (scaffold + Neon DB wired). Phase 3 (Auth.js + SoundCloud OAuth provider) is next.

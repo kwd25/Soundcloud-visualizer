@@ -27,10 +27,12 @@ Running roadmap. Update checkboxes as work lands. Each phase has a goal + accept
 **Goal**: schema lives in Neon; can read/write from the app.
 **Accept**: `pnpm db:push` succeeds against a Neon project; a manual `INSERT` + `SELECT` round-trips through Drizzle.
 
-- [ ] Create Neon project + paste `DATABASE_URL` into `.env.local`
-- [ ] `pnpm db:push` applies schema
-- [ ] Smoke test: `/api/health` reads a row count from `auth_users`
-- [ ] Add `pnpm db:push` to Vercel deploy hook (or document manual step)
+- [x] Create Neon project (via Vercel Storage marketplace integration) — auto-injects `DATABASE_URL`
+- [x] `pnpm dlx vercel link` + `pnpm dlx vercel env pull .env.local`
+- [x] `pnpm db:push` applies schema (use `--force` for non-TTY contexts)
+- [x] Smoke test: `/api/health` reads `auth_users` count and returns it; INSERT → SELECT → DELETE round-trip confirmed via Neon HTTP driver
+- [x] Placeholder env vars set in Vercel for Production / Preview / Development so deploys keep building
+- [ ] Schema changes during dev: re-run `pnpm db:push` manually. Production migrations will use `pnpm db:generate` + commit + apply via deploy hook (configure in Phase 9).
 
 ---
 
