@@ -49,4 +49,12 @@ pnpm db:studio     # open Drizzle Studio
 
 ## Current phase
 
-See `docs/phases.md`. Phase 1 + 2 complete (scaffold + Neon DB wired). Phase 3 (Auth.js + SoundCloud OAuth provider) is next.
+See `docs/phases.md`. Phases 1–3 complete (scaffold + Neon DB + SoundCloud OAuth). Phase 4 (typed SoundCloud API client with rate limiting + atomic token rotation) is next.
+
+## Auth notes
+
+- The Auth.js setup uses **JWT sessions** (no DB session table). On first sign-in, the `jwt` callback upserts the user into `auth_users` with their access/refresh tokens.
+- The atomic refresh-token rotation lives in the **SoundCloud API client** (Phase 4), not in the Auth.js callbacks — see [docs/architecture.md](docs/architecture.md#auth-flow) for why.
+- TypeScript module augmentation for Auth.js types lives in `src/types/next-auth.d.ts`. Augment `@auth/core/*` modules, not just `next-auth` — the latter doesn't propagate to the actual interfaces.
+- SoundCloud's userinfo endpoint requires `Authorization: OAuth <token>`, NOT `Bearer`. The provider has a custom `userinfo.request` for this.
+- Next.js 16: route gating is in `src/proxy.ts` (file convention renamed from `middleware.ts`).

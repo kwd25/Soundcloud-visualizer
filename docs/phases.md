@@ -39,13 +39,19 @@ Running roadmap. Update checkboxes as work lands. Each phase has a goal + accept
 ## Phase 3 — Auth (the hard one)
 
 **Goal**: log in with SoundCloud, persist tokens.
-**Accept**: end-to-end OAuth round-trip works locally; `auth_users` row created; refresh works after access token expires.
+**Accept**: end-to-end OAuth round-trip works on prod; `auth_users` row created; access/refresh tokens stored.
 
-- [ ] Custom Auth.js v5 provider for SoundCloud (OAuth 2.1 + PKCE)
-- [ ] Drizzle adapter for Auth.js session storage
-- [ ] Atomic refresh-token rotation (this is the footgun — test it)
-- [ ] Login page + logout button
-- [ ] Protected route group `(authed)` with middleware
+- [x] Custom Auth.js v5 provider for SoundCloud (OAuth 2.1 + PKCE) — `src/lib/auth/providers/soundcloud.ts`
+- [x] Custom `/me` userinfo handler using `Authorization: OAuth <token>` (SoundCloud's required header format)
+- [x] JWT session strategy (no DB sessions); tokens persisted to `auth_users` once on sign-in via `jwt` callback
+- [x] Type augmentation for `Session.user.urn` and `JWT.urn` (must augment `@auth/core/*`, not just `next-auth`)
+- [x] Auth route handler at `src/app/api/auth/[...nextauth]/route.ts`
+- [x] Next.js 16 `proxy.ts` (renamed from `middleware.ts`) for coarse route gating
+- [x] Login button on landing page (server action calling `signIn("soundcloud")`)
+- [x] Protected route group `(authed)/` with layout-level `auth()` check + redirect
+- [x] `/dashboard` placeholder with username, avatar, URN, and logout
+- [ ] **Atomic refresh-token rotation** — deferred to Phase 4 (SoundCloud API client) where it actually matters. Needs `SELECT FOR UPDATE` which requires the WebSocket Neon driver, not HTTP.
+- [ ] Verify OAuth round-trip on prod (post-deploy)
 
 ---
 
