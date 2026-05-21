@@ -1,3 +1,4 @@
+import { CrawlStatus } from "@/components/crawl-status";
 import { auth, signOut } from "@/lib/auth";
 
 export default async function Dashboard() {
@@ -22,15 +23,7 @@ export default async function Dashboard() {
 					<p className="text-sm text-muted-foreground break-all">{user?.urn}</p>
 				</div>
 
-				<div className="rounded-md border bg-muted/30 p-6 text-left text-sm">
-					<p className="font-medium">Coming next:</p>
-					<ul className="mt-2 list-disc pl-5 text-muted-foreground">
-						<li>Phase 4 — SoundCloud API client</li>
-						<li>Phase 5 — Inngest crawler over your likes</li>
-						<li>Phase 6 — community detection + layout</li>
-						<li>Phase 7 — interactive WebGL graph</li>
-					</ul>
-				</div>
+				<CrawlStatus />
 
 				<form
 					action={async () => {
