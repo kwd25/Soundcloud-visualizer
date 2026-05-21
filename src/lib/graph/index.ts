@@ -1,65 +1,111 @@
-import { buildGraphForOwner } from "./build";
+import { buildGraphForOwner, type ViewKind } from "./build";
 import { assignCommunities } from "./community";
 import { assignLayout } from "./layout";
 import { clearOwnerLayout, graphToLayoutRows, insertLayout } from "./persist";
+import { computeCoListenerEdges, persistCoListenerEdges } from "./projection";
 
-export interface ComputeLayoutResult {
+export interface ViewResult {
 	nodes: number;
 	edges: number;
-	prunedNodes: number;
 	communities: number;
 	modularity: number;
-	rowsWritten: number;
+}
+
+export interface ComputeLayoutResult {
+	bipartite: ViewResult & { prunedNodes: number };
+	tracks: ViewResult & { kept: number };
 }
 
 /**
- * Load this owner's graph from Neon, prune one-off nodes, run Louvain +
- * ForceAtlas2, and persist (x, y, community_id) per node into the `layout`
- * table.
+ * After a crawl:
+ * 1. Derive the track ↔ track co-listener projection (weight ≥ 3 default)
+ *    and persist as edges with edge_type='co_listener'.
+ * 2. Build the bipartite graph, run Louvain + FA2, persist layout view='bipartite'.
+ * 3. Build the tracks-only graph from co_listener edges, run Louvain + FA2,
+ *    persist layout view='tracks'.
  *
- * Idempotent: clears the owner's previous layout rows first.
- *
- * Must complete in one serverless invocation (≤60s on Vercel Hobby) since
- * it's wrapped in a single step.run(). Pruning + Barnes-Hut keep it under
- * that budget even on raw 75k-node graphs.
+ * Both views must complete in one Inngest step.run() (≤60s on Hobby).
+ * Bipartite is pruned to degree≥2 to fit the budget; tracks view is small
+ * by construction (≤ owner's seed count, usually 1k–2k).
  */
-export async function computeLayoutAndCommunities(
+export async function computeAllLayouts(
 	ownerUrn: string,
-	opts?: { iterations?: number; minDegree?: number },
+	opts?: {
+		bipartiteMinDegree?: number;
+		tracksMinWeight?: number;
+		iterations?: { bipartite?: number; tracks?: number };
+	},
 ): Promise<ComputeLayoutResult> {
-	const graph = await buildGraphForOwner(ownerUrn, {
-		minDegree: opts?.minDegree ?? 2,
+	// ── tracks projection (compute + persist co_listener edges) ──
+	const coEdges = await computeCoListenerEdges(ownerUrn, {
+		minWeight: opts?.tracksMinWeight ?? 3,
 	});
-	const prunedNodes = (graph.getAttribute("prunedNodes") as number) ?? 0;
+	await persistCoListenerEdges(ownerUrn, coEdges);
 
-	if (graph.order === 0) {
-		return {
-			nodes: 0,
-			edges: 0,
-			prunedNodes,
-			communities: 0,
-			modularity: 0,
-			rowsWritten: 0,
+	// ── bipartite view layout ──
+	const biGraph = await buildGraphForOwner({
+		view: "bipartite",
+		ownerUrn,
+		minDegree: opts?.bipartiteMinDegree ?? 2,
+	});
+	const biPruned = (biGraph.getAttribute("prunedNodes") as number) ?? 0;
+
+	let bipartiteResult: ViewResult & { prunedNodes: number } = {
+		nodes: 0,
+		edges: 0,
+		prunedNodes: biPruned,
+		communities: 0,
+		modularity: 0,
+	};
+
+	if (biGraph.order > 0) {
+		const { count, modularity } = assignCommunities(biGraph);
+		assignLayout(biGraph, opts?.iterations?.bipartite ?? 300);
+		const rows = graphToLayoutRows(ownerUrn, "bipartite", biGraph);
+		await clearOwnerLayout(ownerUrn, "bipartite");
+		await insertLayout(rows);
+		bipartiteResult = {
+			nodes: biGraph.order,
+			edges: biGraph.size,
+			prunedNodes: biPruned,
+			communities: count,
+			modularity,
 		};
 	}
 
-	const { count, modularity } = assignCommunities(graph);
-	assignLayout(graph, opts?.iterations ?? 300);
+	// ── tracks view layout ──
+	const trackGraph = await buildGraphForOwner({
+		view: "tracks",
+		ownerUrn,
+	});
 
-	const rows = graphToLayoutRows(ownerUrn, graph);
-	await clearOwnerLayout(ownerUrn);
-	const rowsWritten = await insertLayout(rows);
-
-	return {
-		nodes: graph.order,
-		edges: graph.size,
-		prunedNodes,
-		communities: count,
-		modularity,
-		rowsWritten,
+	let tracksResult: ViewResult & { kept: number } = {
+		nodes: 0,
+		edges: 0,
+		kept: coEdges.length,
+		communities: 0,
+		modularity: 0,
 	};
+
+	if (trackGraph.order > 0) {
+		const { count, modularity } = assignCommunities(trackGraph);
+		assignLayout(trackGraph, opts?.iterations?.tracks ?? 500);
+		const rows = graphToLayoutRows(ownerUrn, "tracks", trackGraph);
+		await clearOwnerLayout(ownerUrn, "tracks");
+		await insertLayout(rows);
+		tracksResult = {
+			nodes: trackGraph.order,
+			edges: trackGraph.size,
+			kept: coEdges.length,
+			communities: count,
+			modularity,
+		};
+	}
+
+	return { bipartite: bipartiteResult, tracks: tracksResult };
 }
 
+export type { ViewKind } from "./build";
 export { buildGraphForOwner } from "./build";
 export { assignCommunities } from "./community";
 export { assignLayout } from "./layout";
@@ -68,3 +114,7 @@ export {
 	graphToLayoutRows,
 	insertLayout,
 } from "./persist";
+export {
+	computeCoListenerEdges,
+	persistCoListenerEdges,
+} from "./projection";

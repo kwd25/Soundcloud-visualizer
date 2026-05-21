@@ -76,14 +76,15 @@ export const layout = pgTable(
 			.notNull()
 			.references(() => authUsers.soundcloudUrn, { onDelete: "cascade" }),
 		nodeUrn: text().notNull(),
+		view: text().notNull().default("bipartite"),
 		x: real().notNull(),
 		y: real().notNull(),
 		communityId: integer(),
 	},
 	(t) => [
-		primaryKey({ columns: [t.ownerUrn, t.nodeUrn] }),
-		index("layout_owner_idx").on(t.ownerUrn),
-		index("layout_community_idx").on(t.ownerUrn, t.communityId),
+		primaryKey({ columns: [t.ownerUrn, t.nodeUrn, t.view] }),
+		index("layout_owner_view_idx").on(t.ownerUrn, t.view),
+		index("layout_community_idx").on(t.ownerUrn, t.view, t.communityId),
 	],
 );
 

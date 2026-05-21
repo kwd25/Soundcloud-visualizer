@@ -1,53 +1,76 @@
-import { eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import Graph from "graphology";
 import { db } from "@/lib/db";
 import { edges } from "@/lib/db/schema";
 
-export interface BuildGraphOptions {
-	/**
-	 * Drop nodes whose degree (in the combined edge set) is less than this.
-	 * Always keeps the owner node and all seed tracks regardless.
-	 *
-	 * Defaults to 2 — drops one-off favoriters (which are ~85% of the raw
-	 * graph and dominate runtime without contributing to community structure).
-	 * Set to 1 to keep everything.
-	 */
+export type ViewKind = "bipartite" | "tracks";
+
+interface BipartiteOptions {
+	view: "bipartite";
+	ownerUrn: string;
 	minDegree?: number;
-	/** The owner's URN so we never prune the central node. */
+}
+
+interface TracksOptions {
+	view: "tracks";
 	ownerUrn: string;
 }
 
 /**
- * Build an undirected graphology Graph from the `edges` table for one owner.
+ * Build an undirected graphology Graph for one owner, scoped to a view.
  *
- * The bipartite (users → tracks) edges are collapsed into an undirected graph
- * for community detection and layout. Duplicate edges are ignored. Low-degree
- * nodes are pruned by default — see `minDegree`.
+ * - view='bipartite': all `liked` edges (user ↔ track), pruned by minDegree.
+ *   Keeps owner node always; iteratively drops below-threshold nodes.
+ * - view='tracks': only `co_listener` edges (track ↔ track) with weight≥3.
  */
 export async function buildGraphForOwner(
-	ownerUrn: string,
-	opts?: { minDegree?: number },
+	opts: BipartiteOptions | TracksOptions,
 ): Promise<Graph> {
-	const minDegree = opts?.minDegree ?? 2;
-	const rows = await db
-		.select()
-		.from(edges)
-		.where(eq(edges.ownerUrn, ownerUrn));
+	if (opts.view === "tracks") {
+		return buildTracksGraph(opts.ownerUrn);
+	}
+	return buildBipartiteGraph(opts.ownerUrn, opts.minDegree ?? 2);
+}
 
-	// First pass: build the full graph
+async function buildTracksGraph(ownerUrn: string): Promise<Graph> {
+	const rows = await db
+		.select({ src: edges.srcUrn, dst: edges.dstUrn, weight: edges.weight })
+		.from(edges)
+		.where(
+			and(eq(edges.ownerUrn, ownerUrn), eq(edges.edgeType, "co_listener")),
+		);
+
 	const graph = new Graph({ type: "undirected", multi: false });
 	for (const row of rows) {
-		if (!graph.hasNode(row.srcUrn)) graph.addNode(row.srcUrn);
-		if (!graph.hasNode(row.dstUrn)) graph.addNode(row.dstUrn);
-		if (!graph.hasEdge(row.srcUrn, row.dstUrn)) {
-			graph.addEdge(row.srcUrn, row.dstUrn, { weight: row.weight });
+		if (!graph.hasNode(row.src)) graph.addNode(row.src);
+		if (!graph.hasNode(row.dst)) graph.addNode(row.dst);
+		if (!graph.hasEdge(row.src, row.dst)) {
+			graph.addEdge(row.src, row.dst, { weight: row.weight });
+		}
+	}
+	return graph;
+}
+
+async function buildBipartiteGraph(
+	ownerUrn: string,
+	minDegree: number,
+): Promise<Graph> {
+	const rows = await db
+		.select({ src: edges.srcUrn, dst: edges.dstUrn, weight: edges.weight })
+		.from(edges)
+		.where(and(eq(edges.ownerUrn, ownerUrn), eq(edges.edgeType, "liked")));
+
+	const graph = new Graph({ type: "undirected", multi: false });
+	for (const row of rows) {
+		if (!graph.hasNode(row.src)) graph.addNode(row.src);
+		if (!graph.hasNode(row.dst)) graph.addNode(row.dst);
+		if (!graph.hasEdge(row.src, row.dst)) {
+			graph.addEdge(row.src, row.dst, { weight: row.weight });
 		}
 	}
 
 	if (minDegree <= 1) return graph;
 
-	// Iteratively prune nodes below threshold (one pass is usually enough;
-	// repeat until stable to remove cascading low-degree nodes).
 	let removed = 0;
 	while (true) {
 		const toRemove: string[] = [];
@@ -59,7 +82,9 @@ export async function buildGraphForOwner(
 		for (const node of toRemove) graph.dropNode(node);
 		removed += toRemove.length;
 	}
-
 	graph.setAttribute("prunedNodes", removed);
 	return graph;
 }
+
+// Re-export sql for callers that need it (e.g. tests).
+export { sql };

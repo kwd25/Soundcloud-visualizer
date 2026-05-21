@@ -1,9 +1,16 @@
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
+import type { NextRequest } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { edges, layout, tracks, users } from "@/lib/db/schema";
 
 export const dynamic = "force-dynamic";
+
+type ViewKind = "bipartite" | "tracks";
+
+function parseView(value: string | null): ViewKind {
+	return value === "bipartite" ? "bipartite" : "tracks";
+}
 
 interface NodePayload {
 	urn: string;
@@ -25,21 +32,23 @@ interface EdgePayload {
 	weight: number;
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
 	const session = await auth();
 	if (!session?.user?.urn) {
 		return Response.json({ error: "unauthorized" }, { status: 401 });
 	}
 
 	const ownerUrn = session.user.urn;
+	const view = parseView(req.nextUrl.searchParams.get("view"));
+	const edgeType = view === "tracks" ? "co_listener" : "liked";
 
 	const layoutRows = await db
 		.select()
 		.from(layout)
-		.where(eq(layout.ownerUrn, ownerUrn));
+		.where(and(eq(layout.ownerUrn, ownerUrn), eq(layout.view, view)));
 
 	if (layoutRows.length === 0) {
-		return Response.json({ nodes: [], edges: [], ownerUrn });
+		return Response.json({ view, nodes: [], edges: [], ownerUrn });
 	}
 
 	const nodeUrns = layoutRows.map((r) => r.nodeUrn);
@@ -47,11 +56,15 @@ export async function GET() {
 	const [trackRows, userRows, edgeRows] = await Promise.all([
 		db.select().from(tracks).where(inArray(tracks.urn, nodeUrns)),
 		db.select().from(users).where(inArray(users.urn, nodeUrns)),
-		db.select().from(edges).where(eq(edges.ownerUrn, ownerUrn)),
+		db
+			.select()
+			.from(edges)
+			.where(and(eq(edges.ownerUrn, ownerUrn), eq(edges.edgeType, edgeType))),
 	]);
 
 	const trackByUrn = new Map(trackRows.map((t) => [t.urn, t]));
 	const userByUrn = new Map(userRows.map((u) => [u.urn, u]));
+	const layoutNodes = new Set(nodeUrns);
 
 	const nodes: NodePayload[] = layoutRows.map((l) => {
 		const track = trackByUrn.get(l.nodeUrn);
@@ -82,13 +95,16 @@ export async function GET() {
 		};
 	});
 
-	const edgePayload: EdgePayload[] = edgeRows.map((e) => ({
-		src: e.srcUrn,
-		dst: e.dstUrn,
-		weight: e.weight,
-	}));
+	const edgePayload: EdgePayload[] = edgeRows
+		.filter((e) => layoutNodes.has(e.srcUrn) && layoutNodes.has(e.dstUrn))
+		.map((e) => ({
+			src: e.srcUrn,
+			dst: e.dstUrn,
+			weight: e.weight,
+		}));
 
 	return Response.json({
+		view,
 		ownerUrn,
 		nodes,
 		edges: edgePayload,
