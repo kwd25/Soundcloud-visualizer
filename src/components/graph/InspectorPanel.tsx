@@ -37,6 +37,30 @@ export function InspectorPanel({ selected, view, onClose }: Props) {
 	);
 }
 
+function widgetUrlFor(track: GraphNode): string | null {
+	if (track.kind !== "track" || !track.permalink_url) return null;
+	return `https://w.soundcloud.com/player/?url=${encodeURIComponent(track.permalink_url)}&color=%2378dcb4&auto_play=false&hide_related=true&show_user=true&visual=false`;
+}
+
+function SoundCloudWidget({ track }: { track: GraphNode }) {
+	const url = widgetUrlFor(track);
+	if (!url) return null;
+	return (
+		<div className="overflow-hidden rounded-lg border border-white/10">
+			<iframe
+				key={track.urn}
+				title={`SoundCloud player for ${track.label ?? track.urn}`}
+				width="100%"
+				height="120"
+				scrolling="no"
+				frameBorder="no"
+				allow="autoplay"
+				src={url}
+			/>
+		</div>
+	);
+}
+
 function NodePanel({
 	node,
 	onClose,
@@ -45,10 +69,6 @@ function NodePanel({
 	onClose: () => void;
 }) {
 	const isTrack = node.kind === "track";
-	const widgetUrl =
-		isTrack && node.permalink_url
-			? `https://w.soundcloud.com/player/?url=${encodeURIComponent(node.permalink_url)}&color=%2378dcb4&auto_play=false&hide_related=true&show_user=true&visual=false`
-			: null;
 
 	return (
 		<div className="glass-strong pointer-events-auto absolute right-4 top-4 z-10 w-96 max-w-[calc(100vw-2rem)] overflow-hidden">
@@ -84,20 +104,7 @@ function NodePanel({
 					)}
 				</div>
 
-				{widgetUrl && (
-					<div className="overflow-hidden rounded-lg border border-white/10">
-						<iframe
-							key={node.urn}
-							title={`SoundCloud player for ${node.label}`}
-							width="100%"
-							height="120"
-							scrolling="no"
-							frameBorder="no"
-							allow="autoplay"
-							src={widgetUrl}
-						/>
-					</div>
-				)}
+				{isTrack && <SoundCloudWidget track={node} />}
 
 				{node.community != null && (
 					<div className="text-xs text-muted-foreground">
@@ -177,8 +184,10 @@ function EdgePanel({
 
 			<div className="space-y-4 p-4">
 				<NodePreview node={src} />
+				{src.kind === "track" && <SoundCloudWidget track={src} />}
 				<div className="border-t border-dashed border-white/15" />
 				<NodePreview node={dst} />
+				{dst.kind === "track" && <SoundCloudWidget track={dst} />}
 
 				<div className="rounded-md border border-white/10 bg-white/5 p-3 text-xs">
 					<p className="text-muted-foreground">
