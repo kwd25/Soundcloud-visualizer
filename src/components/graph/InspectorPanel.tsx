@@ -183,11 +183,17 @@ function EdgePanel({
 			/>
 
 			<div className="space-y-4 p-4">
-				<NodePreview node={src} />
-				{src.kind === "track" && <SoundCloudWidget track={src} />}
+				{src.kind === "track" ? (
+					<SoundCloudWidget track={src} />
+				) : (
+					<NodePreview node={src} />
+				)}
 				<div className="border-t border-dashed border-white/15" />
-				<NodePreview node={dst} />
-				{dst.kind === "track" && <SoundCloudWidget track={dst} />}
+				{dst.kind === "track" ? (
+					<SoundCloudWidget track={dst} />
+				) : (
+					<NodePreview node={dst} />
+				)}
 
 				<div className="rounded-md border border-white/10 bg-white/5 p-3 text-xs">
 					<p className="text-muted-foreground">
