@@ -15,8 +15,8 @@ import type { GraphNode, GraphPayload } from "./types";
 // Edge color is intentionally close to background so that even when many edges
 // overlap (common with 30k+ edges in this graph), the stack converges toward
 // this near-bg color instead of saturating to white.
-const EDGE_COLOR = "rgba(70, 80, 100, 0.06)";
-const EDGE_SIZE = 0.1;
+const EDGE_COLOR = "rgba(110, 130, 165, 0.12)";
+const EDGE_SIZE = 0.15;
 
 interface Props {
 	data: GraphPayload;
