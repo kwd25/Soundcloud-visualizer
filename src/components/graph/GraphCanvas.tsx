@@ -10,25 +10,23 @@ import {
 	SELECTION_COLOR,
 } from "./community-colors";
 import { drawGlassHover } from "./hover-renderer";
-import type { GraphNode, GraphPayload } from "./types";
-
-// Edge color is intentionally close to background so that even when many edges
-// overlap (common with 30k+ edges in this graph), the stack converges toward
-// this near-bg color instead of saturating to white.
-const EDGE_COLOR = "rgba(110, 130, 165, 0.12)";
-const EDGE_SIZE = 0.15;
+import type { GraphNode, GraphPayload, Selected } from "./types";
 
 interface Props {
 	data: GraphPayload;
-	selectedUrn: string | null;
-	onSelectNode: (node: GraphNode | null) => void;
+	selected: Selected | null;
+	onSelect: (sel: Selected | null) => void;
 	hiddenCommunities: Set<number>;
 }
 
+// Edges blend into the background; near-bg blue-grey, very thin.
+const EDGE_COLOR = "rgba(110, 130, 165, 0.12)";
+const EDGE_SIZE = 0.15;
+
 export function GraphCanvas({
 	data,
-	selectedUrn,
-	onSelectNode,
+	selected,
+	onSelect,
 	hiddenCommunities,
 }: Props) {
 	const containerRef = useRef<HTMLDivElement>(null);
@@ -51,7 +49,7 @@ export function GraphCanvas({
 		return communityPalette(max + 1);
 	}, [data.nodes]);
 
-	// Build graphology graph once per data load
+	// Build graphology graph + mount sigma whenever data changes.
 	useEffect(() => {
 		if (!containerRef.current) return;
 		try {
@@ -85,13 +83,13 @@ export function GraphCanvas({
 						graph.addEdge(e.src, e.dst, {
 							size: EDGE_SIZE,
 							color: EDGE_COLOR,
+							weight: e.weight,
 						});
 					}
 				}
 			}
 			graphRef.current = graph;
 
-			// Mount sigma
 			sigmaRef.current?.kill();
 			const sigma = new Sigma(graph, containerRef.current, {
 				renderEdgeLabels: false,
@@ -105,14 +103,24 @@ export function GraphCanvas({
 				minCameraRatio: 0.05,
 				maxCameraRatio: 20,
 				minEdgeThickness: 0.4,
+				enableEdgeEvents: true,
 				defaultDrawNodeHover: drawGlassHover,
 			});
 
 			sigma.on("clickNode", ({ node }) => {
 				const data = nodeByUrn.get(node);
-				if (data) onSelectNode(data);
+				if (data) onSelect({ kind: "node", node: data });
 			});
-			sigma.on("clickStage", () => onSelectNode(null));
+			sigma.on("clickEdge", ({ edge }) => {
+				const extr = graph.extremities(edge);
+				const src = nodeByUrn.get(extr[0]);
+				const dst = nodeByUrn.get(extr[1]);
+				const weight = (graph.getEdgeAttribute(edge, "weight") as number) ?? 1;
+				if (src && dst) {
+					onSelect({ kind: "edge", edge: { src, dst, weight } });
+				}
+			});
+			sigma.on("clickStage", () => onSelect(null));
 
 			sigmaRef.current = sigma;
 			return () => {
@@ -122,19 +130,27 @@ export function GraphCanvas({
 		} catch (e) {
 			setError(e instanceof Error ? e.message : "failed to render graph");
 		}
-	}, [data, palette, nodeByUrn, onSelectNode]);
+	}, [data, palette, nodeByUrn, onSelect]);
 
-	// Update node colors when selection or hidden communities change
+	// Re-color nodes when selection or hidden communities change.
 	useEffect(() => {
 		const graph = graphRef.current;
 		const sigma = sigmaRef.current;
 		if (!graph || !sigma) return;
 
+		const selectedNodeUrns = new Set<string>();
+		if (selected?.kind === "node") {
+			selectedNodeUrns.add(selected.node.urn);
+		} else if (selected?.kind === "edge") {
+			selectedNodeUrns.add(selected.edge.src.urn);
+			selectedNodeUrns.add(selected.edge.dst.urn);
+		}
+
 		graph.forEachNode((node, attrs) => {
 			const community = attrs.community as number | null;
 			const isHidden = community != null && hiddenCommunities.has(community);
 			const isOwner = node === data.ownerUrn;
-			const isSelected = node === selectedUrn;
+			const isSelected = selectedNodeUrns.has(node);
 
 			let color: string;
 			if (isSelected) color = SELECTION_COLOR;
@@ -148,8 +164,25 @@ export function GraphCanvas({
 				isHidden && !isSelected && !isOwner,
 			);
 		});
+
+		// Highlight selected edge: brighter amethyst.
+		graph.forEachEdge((edge) => {
+			graph.setEdgeAttribute(edge, "color", EDGE_COLOR);
+			graph.setEdgeAttribute(edge, "size", EDGE_SIZE);
+		});
+		if (selected?.kind === "edge") {
+			const { src, dst } = selected.edge;
+			if (graph.hasEdge(src.urn, dst.urn)) {
+				const edgeKey = graph.edge(src.urn, dst.urn);
+				if (edgeKey != null) {
+					graph.setEdgeAttribute(edgeKey, "color", SELECTION_COLOR);
+					graph.setEdgeAttribute(edgeKey, "size", 1.5);
+				}
+			}
+		}
+
 		sigma.refresh();
-	}, [selectedUrn, hiddenCommunities, palette, data.ownerUrn]);
+	}, [selected, hiddenCommunities, palette, data.ownerUrn]);
 
 	if (error) {
 		return (

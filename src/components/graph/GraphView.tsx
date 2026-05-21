@@ -5,7 +5,11 @@ import { useCallback, useEffect, useState } from "react";
 import { CommunityLegend } from "./CommunityLegend";
 import { GraphCanvas } from "./GraphCanvas";
 import { InspectorPanel } from "./InspectorPanel";
-import type { GraphNode, GraphPayload } from "./types";
+import {
+	type GraphPayload,
+	MIN_VISIBLE_COMMUNITY_SIZE,
+	type Selected,
+} from "./types";
 
 type ViewKind = "tracks" | "bipartite";
 
@@ -24,7 +28,7 @@ export function GraphView() {
 	const [data, setData] = useState<GraphPayload | null>(null);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
-	const [selected, setSelected] = useState<GraphNode | null>(null);
+	const [selected, setSelected] = useState<Selected | null>(null);
 	const [hidden, setHidden] = useState<Set<number>>(new Set());
 
 	useEffect(() => {
@@ -32,7 +36,6 @@ export function GraphView() {
 		setLoading(true);
 		setData(null);
 		setSelected(null);
-		setHidden(new Set());
 		(async () => {
 			try {
 				const res = await fetch(`/api/graph?view=${view}`, {
@@ -40,7 +43,21 @@ export function GraphView() {
 				});
 				if (!res.ok) throw new Error(`HTTP ${res.status}`);
 				const payload: GraphPayload = await res.json();
-				if (!cancelled) setData(payload);
+				if (cancelled) return;
+				setData(payload);
+
+				// Auto-hide communities at or below the size threshold.
+				const counts = new Map<number, number>();
+				for (const n of payload.nodes) {
+					if (n.community != null) {
+						counts.set(n.community, (counts.get(n.community) ?? 0) + 1);
+					}
+				}
+				const small = new Set<number>();
+				for (const [id, c] of counts) {
+					if (c <= MIN_VISIBLE_COMMUNITY_SIZE) small.add(id);
+				}
+				setHidden(small);
 			} catch (e) {
 				if (!cancelled)
 					setError(e instanceof Error ? e.message : "graph fetch failed");
@@ -64,7 +81,6 @@ export function GraphView() {
 
 	return (
 		<div className="relative h-screen w-screen overflow-hidden">
-			{/* Canvas (or placeholder) */}
 			{loading ? (
 				<div className="flex h-full items-center justify-center">
 					<div className="glass-strong px-8 py-6 text-sm text-muted-foreground">
@@ -103,13 +119,12 @@ export function GraphView() {
 			) : (
 				<GraphCanvas
 					data={data}
-					selectedUrn={selected?.urn ?? null}
-					onSelectNode={setSelected}
+					selected={selected}
+					onSelect={setSelected}
 					hiddenCommunities={hidden}
 				/>
 			)}
 
-			{/* Header */}
 			<header className="glass-strong pointer-events-auto absolute left-4 top-4 z-10 flex items-center gap-3 px-4 py-2">
 				<Link
 					href="/dashboard"
@@ -149,7 +164,11 @@ export function GraphView() {
 						onToggle={toggleCommunity}
 						onSetAll={setHidden}
 					/>
-					<InspectorPanel node={selected} onClose={() => setSelected(null)} />
+					<InspectorPanel
+						selected={selected}
+						view={view}
+						onClose={() => setSelected(null)}
+					/>
 				</>
 			)}
 		</div>

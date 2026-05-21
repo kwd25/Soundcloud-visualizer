@@ -20,6 +20,20 @@ export interface GraphEdge {
 
 export interface GraphPayload {
 	ownerUrn: string;
+	view: "tracks" | "bipartite";
 	nodes: GraphNode[];
 	edges: GraphEdge[];
 }
+
+export interface SelectedEdge {
+	src: GraphNode;
+	dst: GraphNode;
+	weight: number;
+}
+
+export type Selected =
+	| { kind: "node"; node: GraphNode }
+	| { kind: "edge"; edge: SelectedEdge };
+
+/** Hide communities whose member count is ≤ this. Configurable later. */
+export const MIN_VISIBLE_COMMUNITY_SIZE = 5;

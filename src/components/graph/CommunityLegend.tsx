@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { communityPalette } from "./community-colors";
-import type { GraphPayload } from "./types";
+import { type GraphPayload, MIN_VISIBLE_COMMUNITY_SIZE } from "./types";
 
 interface Props {
 	data: GraphPayload;
@@ -12,7 +12,9 @@ interface Props {
 }
 
 export function CommunityLegend({ data, hidden, onToggle, onSetAll }: Props) {
-	const sized = useMemo(() => {
+	const [showSmall, setShowSmall] = useState(false);
+
+	const { visible, smallCount } = useMemo(() => {
 		const counts = new Map<number, number>();
 		for (const n of data.nodes) {
 			if (n.community == null) continue;
@@ -25,23 +27,35 @@ export function CommunityLegend({ data, hidden, onToggle, onSetAll }: Props) {
 				0,
 			) + 1;
 		const palette = communityPalette(max);
-		return Array.from(counts.entries())
+		const allSorted = Array.from(counts.entries())
 			.sort((a, b) => b[1] - a[1])
 			.map(([id, count]) => ({ id, count, color: palette[id] }));
-	}, [data]);
+		const filtered = showSmall
+			? allSorted
+			: allSorted.filter((c) => c.count > MIN_VISIBLE_COMMUNITY_SIZE);
+		const smallCount = allSorted.length - filtered.length;
+		return { visible: filtered, smallCount };
+	}, [data, showSmall]);
 
-	const allIds = useMemo(() => sized.map((s) => s.id), [sized]);
 	const allVisible = hidden.size === 0;
-	const allHidden = hidden.size === allIds.length;
+	const visibleIds = useMemo(() => visible.map((s) => s.id), [visible]);
+	const allHidden = visibleIds.every((id) => hidden.has(id));
 
 	return (
-		<aside className="glass-strong pointer-events-auto absolute bottom-4 left-4 z-10 max-h-[60vh] w-64 overflow-hidden">
+		<aside className="glass-strong pointer-events-auto absolute bottom-4 left-4 z-10 max-h-[70vh] w-64 overflow-hidden">
 			<div className="border-b border-white/10 px-4 py-3">
 				<p className="text-xs uppercase tracking-widest text-muted-foreground">
 					Communities
 				</p>
 				<p className="mt-1 text-xs text-foreground/80">
-					{sized.length} clusters · {data.nodes.length.toLocaleString()} nodes
+					{visible.length}
+					{smallCount > 0 && (
+						<span className="text-muted-foreground">
+							{" "}
+							of {visible.length + smallCount}
+						</span>
+					)}{" "}
+					clusters · {data.nodes.length.toLocaleString()} nodes
 				</p>
 				<div className="mt-3 grid grid-cols-2 gap-2">
 					<button
@@ -54,16 +68,26 @@ export function CommunityLegend({ data, hidden, onToggle, onSetAll }: Props) {
 					</button>
 					<button
 						type="button"
-						onClick={() => onSetAll(new Set(allIds))}
+						onClick={() => onSetAll(new Set(visibleIds))}
 						disabled={allHidden}
 						className="rounded-md border border-white/15 bg-white/5 px-2 py-1 text-[10px] font-medium uppercase tracking-wider text-foreground/70 transition hover:bg-white/10 disabled:opacity-40"
 					>
 						Deselect all
 					</button>
 				</div>
+				{smallCount > 0 && (
+					<button
+						type="button"
+						onClick={() => setShowSmall((v) => !v)}
+						className="mt-2 w-full text-left text-[10px] uppercase tracking-wider text-muted-foreground hover:text-foreground"
+					>
+						{showSmall ? "Hide" : "Show"} {smallCount} small (≤
+						{MIN_VISIBLE_COMMUNITY_SIZE})
+					</button>
+				)}
 			</div>
-			<div className="max-h-[44vh] space-y-1 overflow-y-auto p-2">
-				{sized.map(({ id, count, color }) => {
+			<div className="max-h-[52vh] space-y-1 overflow-y-auto p-2">
+				{visible.map(({ id, count, color }) => {
 					const isHidden = hidden.has(id);
 					return (
 						<button
