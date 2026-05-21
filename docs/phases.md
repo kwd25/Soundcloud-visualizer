@@ -74,7 +74,7 @@ Running roadmap. Update checkboxes as work lands. Each phase has a goal + accept
 - [x] `src/lib/soundcloud/endpoints.ts` — `me.{profile,likes}`, `tracks.{get,favoriters,reposters}`, `users.{get,likes}` + `paginate()` async generator + `collect()` helper
 - [x] `src/lib/soundcloud/index.ts` — public exports
 - [x] `/api/test/sc-me` smoke endpoint
-- [ ] Verify on prod (post-deploy)
+- [x] Verified on prod: `GET /api/test/sc-me` returned 50 liked tracks (sampled from owner's 1243 total) in 763ms. Auth header, pagination, profile fetch all confirmed working with real SoundCloud data.
 
 ---
 
