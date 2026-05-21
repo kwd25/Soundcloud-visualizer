@@ -12,8 +12,11 @@ import {
 import { drawGlassHover } from "./hover-renderer";
 import type { GraphNode, GraphPayload } from "./types";
 
-const EDGE_COLOR = "rgba(255, 255, 255, 0.02)";
-const EDGE_SIZE = 0.25;
+// Edge color is intentionally close to background so that even when many edges
+// overlap (common with 30k+ edges in this graph), the stack converges toward
+// this near-bg color instead of saturating to white.
+const EDGE_COLOR = "rgba(70, 80, 100, 0.06)";
+const EDGE_SIZE = 0.1;
 
 interface Props {
 	data: GraphPayload;
@@ -101,6 +104,7 @@ export function GraphCanvas({
 				labelRenderedSizeThreshold: 5,
 				minCameraRatio: 0.05,
 				maxCameraRatio: 20,
+				minEdgeThickness: 0.4,
 				defaultDrawNodeHover: drawGlassHover,
 			});
 
