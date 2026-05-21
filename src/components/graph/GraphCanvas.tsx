@@ -19,11 +19,33 @@ interface Props {
 	hiddenCommunities: Set<number>;
 }
 
-// Edges blend into the background but we keep size larger than strictly
-// needed for visuals so sigma's hit-test gives the click a fair target.
-// Alpha is dropped proportionally so dense regions don't saturate.
-const EDGE_COLOR = "rgba(110, 130, 165, 0.06)";
-const EDGE_SIZE = 1.2;
+// Edges blend into the background: thin, low alpha, no visual stacking.
+// Hit detection is handled by our own point-to-segment math (clickStage)
+// so the rendered thickness doesn't constrain the click target.
+const EDGE_COLOR = "rgba(110, 130, 165, 0.12)";
+const EDGE_SIZE = 0.15;
+
+/** Click anywhere within this many CSS pixels of an edge to select it. */
+const EDGE_CLICK_RADIUS_PX = 14;
+
+function distancePointToSegment(
+	px: number,
+	py: number,
+	ax: number,
+	ay: number,
+	bx: number,
+	by: number,
+): number {
+	const dx = bx - ax;
+	const dy = by - ay;
+	const lenSq = dx * dx + dy * dy;
+	if (lenSq === 0) return Math.hypot(px - ax, py - ay);
+	let t = ((px - ax) * dx + (py - ay) * dy) / lenSq;
+	t = Math.max(0, Math.min(1, t));
+	const ix = ax + t * dx;
+	const iy = ay + t * dy;
+	return Math.hypot(px - ix, py - iy);
+}
 
 export function GraphCanvas({
 	data,
@@ -104,8 +126,10 @@ export function GraphCanvas({
 				labelRenderedSizeThreshold: 5,
 				minCameraRatio: 0.05,
 				maxCameraRatio: 20,
-				minEdgeThickness: 0.5,
-				enableEdgeEvents: true,
+				minEdgeThickness: 0.4,
+				// Sigma's built-in edge hit-test is based on rendered thickness and
+				// works poorly for our thin edges. We do our own in clickStage.
+				enableEdgeEvents: false,
 				defaultDrawNodeHover: drawGlassHover,
 			});
 
@@ -113,16 +137,57 @@ export function GraphCanvas({
 				const data = nodeByUrn.get(node);
 				if (data) onSelect({ kind: "node", node: data });
 			});
-			sigma.on("clickEdge", ({ edge }) => {
-				const extr = graph.extremities(edge);
-				const src = nodeByUrn.get(extr[0]);
-				const dst = nodeByUrn.get(extr[1]);
-				const weight = (graph.getEdgeAttribute(edge, "weight") as number) ?? 1;
-				if (src && dst) {
-					onSelect({ kind: "edge", edge: { src, dst, weight } });
+
+			// clickStage fires whenever the click missed every node. We use it to
+			// look for a nearby edge (within EDGE_CLICK_RADIUS_PX) and select it
+			// — or, if nothing nearby, deselect.
+			sigma.on("clickStage", ({ event }) => {
+				const eX = event.x;
+				const eY = event.y;
+				if (typeof eX !== "number" || typeof eY !== "number") {
+					onSelect(null);
+					return;
 				}
+
+				const click = sigma.viewportToGraph({ x: eX, y: eY });
+				const origin = sigma.viewportToGraph({ x: 0, y: 0 });
+				const offset = sigma.viewportToGraph({
+					x: EDGE_CLICK_RADIUS_PX,
+					y: 0,
+				});
+				const radiusGraph = Math.abs(offset.x - origin.x);
+
+				let nearest: string | null = null;
+				let nearestDist = Number.POSITIVE_INFINITY;
+				graph.forEachEdge((edgeKey, _attrs, src, dst) => {
+					const sx = graph.getNodeAttribute(src, "x") as number;
+					const sy = graph.getNodeAttribute(src, "y") as number;
+					const tx = graph.getNodeAttribute(dst, "x") as number;
+					const ty = graph.getNodeAttribute(dst, "y") as number;
+					const d = distancePointToSegment(click.x, click.y, sx, sy, tx, ty);
+					if (d < nearestDist) {
+						nearestDist = d;
+						nearest = edgeKey;
+					}
+				});
+
+				if (nearest && nearestDist < radiusGraph) {
+					const extr = graph.extremities(nearest);
+					const srcNode = nodeByUrn.get(extr[0]);
+					const dstNode = nodeByUrn.get(extr[1]);
+					const weight =
+						(graph.getEdgeAttribute(nearest, "weight") as number) ?? 1;
+					if (srcNode && dstNode) {
+						onSelect({
+							kind: "edge",
+							edge: { src: srcNode, dst: dstNode, weight },
+						});
+						return;
+					}
+				}
+
+				onSelect(null);
 			});
-			sigma.on("clickStage", () => onSelect(null));
 
 			sigmaRef.current = sigma;
 			return () => {
