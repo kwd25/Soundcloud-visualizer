@@ -49,7 +49,7 @@ pnpm db:studio     # open Drizzle Studio
 
 ## Current phase
 
-See `docs/phases.md`. Phases 1–4 complete and verified on prod. The SoundCloud client (`src/lib/soundcloud/`) handles auth, rate limiting, backoff, atomic token rotation, and pagination. Phase 5 (Inngest crawler over a user's likes) is next.
+See `docs/phases.md`. Phases 1–6 written; 1–5 verified on prod (first crawl: 8177 nodes / 8277 edges / 54s with seedCap=100, favoritersCap=100). Phase 6 (Louvain + ForceAtlas2 in a `compute-layout` step) is shipped, awaiting verification on prod after re-running the crawl with bumped caps (seedCap=500, favoritersCap=200). Phase 7 (sigma.js renderer consuming `/api/graph`) is next.
 
 ## Auth notes
 

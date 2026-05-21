@@ -96,12 +96,16 @@ Running roadmap. Update checkboxes as work lands. Each phase has a goal + accept
 ## Phase 6 — Analysis
 
 **Goal**: assign communities and layout coordinates.
-**Accept**: after a crawl, the `layout` table has a row per node with `(x, y, community_id)`.
+**Accept**: after a crawl, the `layout` table has a row per node with `(x, y, community_id)`; modularity > 0.2 = real community structure.
 
-- [ ] Louvain community detection
-- [ ] ForceAtlas2 layout (500 iterations, scaling=10)
-- [ ] Write `layout` rows in transaction
-- [ ] Runs as final step of crawl Inngest function
+- [x] `src/lib/graph/build.ts` — load edges → graphology Graph (undirected, dedup)
+- [x] `src/lib/graph/community.ts` — Louvain wrapper (graphology-communities-louvain detailed mode for modularity score)
+- [x] `src/lib/graph/layout.ts` — ForceAtlas2 wrapper (500 iter, Barnes-Hut auto-on >1k nodes, edge-weighted)
+- [x] `src/lib/graph/persist.ts` — `clearOwnerLayout` + `insertLayout` (batch 500)
+- [x] `src/lib/graph/index.ts` — `computeLayoutAndCommunities` orchestrator
+- [x] `compute-layout` step added to crawl-owner-likes function (between expand loop and finalize)
+- [x] `GET /api/graph` — returns nodes (with x/y/community/metadata) + edges for the authed user
+- [ ] Verify on prod (post-deploy)
 
 ---
 
