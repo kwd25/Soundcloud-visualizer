@@ -39,6 +39,8 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
+  --color-jade: var(--jade);
+  --color-amethyst: var(--amethyst);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -48,83 +50,120 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/*
+ * App theme: dark grey gradient backdrop + jade + amethyst accents.
+ * The :root values are the actual defaults — there's no light-mode toggle
+ * in v1, the whole app runs dark.
+ */
 :root {
-	--background: oklch(1 0 0);
-	--foreground: oklch(0.145 0 0);
-	--card: oklch(1 0 0);
-	--card-foreground: oklch(0.145 0 0);
-	--popover: oklch(1 0 0);
-	--popover-foreground: oklch(0.145 0 0);
-	--primary: oklch(0.205 0 0);
-	--primary-foreground: oklch(0.985 0 0);
-	--secondary: oklch(0.97 0 0);
-	--secondary-foreground: oklch(0.205 0 0);
-	--muted: oklch(0.97 0 0);
-	--muted-foreground: oklch(0.556 0 0);
-	--accent: oklch(0.97 0 0);
-	--accent-foreground: oklch(0.205 0 0);
-	--destructive: oklch(0.577 0.245 27.325);
-	--border: oklch(0.922 0 0);
-	--input: oklch(0.922 0 0);
-	--ring: oklch(0.708 0 0);
-	--chart-1: oklch(0.87 0 0);
-	--chart-2: oklch(0.556 0 0);
-	--chart-3: oklch(0.439 0 0);
-	--chart-4: oklch(0.371 0 0);
-	--chart-5: oklch(0.269 0 0);
-	--radius: 0.625rem;
-	--sidebar: oklch(0.985 0 0);
-	--sidebar-foreground: oklch(0.145 0 0);
-	--sidebar-primary: oklch(0.205 0 0);
-	--sidebar-primary-foreground: oklch(0.985 0 0);
-	--sidebar-accent: oklch(0.97 0 0);
-	--sidebar-accent-foreground: oklch(0.205 0 0);
-	--sidebar-border: oklch(0.922 0 0);
-	--sidebar-ring: oklch(0.708 0 0);
-}
+  /* Background — soft graphite, not pure black. */
+  --background: oklch(0.18 0.012 264);
+  --foreground: oklch(0.97 0.003 264);
 
-.dark {
-	--background: oklch(0.145 0 0);
-	--foreground: oklch(0.985 0 0);
-	--card: oklch(0.205 0 0);
-	--card-foreground: oklch(0.985 0 0);
-	--popover: oklch(0.205 0 0);
-	--popover-foreground: oklch(0.985 0 0);
-	--primary: oklch(0.922 0 0);
-	--primary-foreground: oklch(0.205 0 0);
-	--secondary: oklch(0.269 0 0);
-	--secondary-foreground: oklch(0.985 0 0);
-	--muted: oklch(0.269 0 0);
-	--muted-foreground: oklch(0.708 0 0);
-	--accent: oklch(0.269 0 0);
-	--accent-foreground: oklch(0.985 0 0);
-	--destructive: oklch(0.704 0.191 22.216);
-	--border: oklch(1 0 0 / 10%);
-	--input: oklch(1 0 0 / 15%);
-	--ring: oklch(0.556 0 0);
-	--chart-1: oklch(0.87 0 0);
-	--chart-2: oklch(0.556 0 0);
-	--chart-3: oklch(0.439 0 0);
-	--chart-4: oklch(0.371 0 0);
-	--chart-5: oklch(0.269 0 0);
-	--sidebar: oklch(0.205 0 0);
-	--sidebar-foreground: oklch(0.985 0 0);
-	--sidebar-primary: oklch(0.488 0.243 264.376);
-	--sidebar-primary-foreground: oklch(0.985 0 0);
-	--sidebar-accent: oklch(0.269 0 0);
-	--sidebar-accent-foreground: oklch(0.985 0 0);
-	--sidebar-border: oklch(1 0 0 / 10%);
-	--sidebar-ring: oklch(0.556 0 0);
+  /* Cards / popovers are slightly lighter than bg, near-translucent glass. */
+  --card: oklch(0.23 0.012 264);
+  --card-foreground: oklch(0.97 0.003 264);
+  --popover: oklch(0.23 0.012 264);
+  --popover-foreground: oklch(0.97 0.003 264);
+
+  /* Primary = jade (bright minty green). */
+  --primary: oklch(0.78 0.16 165);
+  --primary-foreground: oklch(0.16 0.012 264);
+
+  --secondary: oklch(0.28 0.012 264);
+  --secondary-foreground: oklch(0.97 0.003 264);
+
+  --muted: oklch(0.26 0.008 264);
+  --muted-foreground: oklch(0.68 0.012 264);
+
+  /* Accent = amethyst (bright purple). */
+  --accent: oklch(0.72 0.18 305);
+  --accent-foreground: oklch(0.16 0.012 264);
+
+  --destructive: oklch(0.7 0.2 25);
+
+  --border: oklch(0.99 0.003 264 / 8%);
+  --input: oklch(0.99 0.003 264 / 12%);
+  --ring: oklch(0.78 0.16 165 / 60%);
+
+  /* Chart colors — keep distinct from communities (which get their own palette). */
+  --chart-1: oklch(0.78 0.16 165);
+  --chart-2: oklch(0.72 0.18 305);
+  --chart-3: oklch(0.78 0.16 80);
+  --chart-4: oklch(0.72 0.18 220);
+  --chart-5: oklch(0.78 0.16 25);
+
+  --radius: 0.875rem;
+
+  --sidebar: oklch(0.22 0.012 264 / 70%);
+  --sidebar-foreground: oklch(0.97 0.003 264);
+  --sidebar-primary: oklch(0.78 0.16 165);
+  --sidebar-primary-foreground: oklch(0.16 0.012 264);
+  --sidebar-accent: oklch(0.28 0.012 264);
+  --sidebar-accent-foreground: oklch(0.97 0.003 264);
+  --sidebar-border: oklch(0.99 0.003 264 / 8%);
+  --sidebar-ring: oklch(0.78 0.16 165 / 60%);
+
+  /* Custom theme tokens used directly in components. */
+  --jade: oklch(0.78 0.16 165);
+  --amethyst: oklch(0.72 0.18 305);
 }
 
 @layer base {
-	* {
-		@apply border-border outline-ring/50;
-	}
-	body {
-		@apply bg-background text-foreground;
-	}
-	html {
-		@apply font-sans;
-	}
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    background-color: var(--background);
+    background-image:
+      radial-gradient(
+        circle at 20% 10%,
+        oklch(0.78 0.16 165 / 8%),
+        transparent 50%
+      ),
+      radial-gradient(
+        circle at 85% 90%,
+        oklch(0.72 0.18 305 / 10%),
+        transparent 55%
+      ),
+      linear-gradient(
+        180deg,
+        oklch(0.16 0.012 264),
+        oklch(0.2 0.012 264)
+      );
+    background-attachment: fixed;
+    color: var(--foreground);
+  }
+  html {
+    @apply font-sans antialiased;
+  }
+}
+
+/* Liquid-glass pane utility. Usage: <div class="glass"> or class="glass-strong". */
+@utility glass {
+  background: oklch(0.97 0.003 264 / 4%);
+  border: 1px solid oklch(0.97 0.003 264 / 8%);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  border-radius: var(--radius);
+}
+
+@utility glass-strong {
+  background: oklch(0.97 0.003 264 / 7%);
+  border: 1px solid oklch(0.97 0.003 264 / 12%);
+  backdrop-filter: blur(28px) saturate(160%);
+  -webkit-backdrop-filter: blur(28px) saturate(160%);
+  border-radius: var(--radius);
+  box-shadow:
+    0 8px 30px oklch(0.05 0.012 264 / 50%),
+    inset 0 1px 0 oklch(0.97 0.003 264 / 8%);
+}
+
+/* Subtle glow for jade/amethyst pieces. */
+@utility glow-jade {
+  box-shadow: 0 0 32px oklch(0.78 0.16 165 / 30%);
+}
+
+@utility glow-amethyst {
+  box-shadow: 0 0 32px oklch(0.72 0.18 305 / 30%);
 }

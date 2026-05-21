@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
 interface CrawlJob {
@@ -59,23 +60,24 @@ export function CrawlStatus() {
 	};
 
 	const running = latest?.status === "running";
+	const done = latest?.status === "done";
 	const buttonLabel = running
 		? "Crawl running…"
-		: latest?.status === "done"
+		: done
 			? "Re-run crawl"
 			: starting
 				? "Starting…"
 				: "Start crawl";
 
 	return (
-		<div className="rounded-md border bg-muted/30 p-6 text-left text-sm space-y-3">
+		<div className="glass-strong space-y-4 p-6 text-left text-sm">
 			<div className="flex items-baseline justify-between gap-4">
-				<p className="font-medium">Community graph crawl</p>
+				<p className="font-medium tracking-wide">Community graph crawl</p>
 				<button
 					type="button"
 					onClick={startCrawl}
 					disabled={running || starting}
-					className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
+					className="rounded-md border border-[var(--jade)]/40 bg-[var(--jade)]/10 px-3 py-1.5 text-xs font-medium text-[var(--jade)] transition hover:bg-[var(--jade)]/20 disabled:opacity-50"
 				>
 					{buttonLabel}
 				</button>
@@ -84,19 +86,23 @@ export function CrawlStatus() {
 			{latest ? (
 				<dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-muted-foreground">
 					<dt>Status</dt>
-					<dd className="font-mono">{latest.status}</dd>
+					<dd className="font-mono text-foreground/80">{latest.status}</dd>
 					<dt>Nodes discovered</dt>
-					<dd className="font-mono">{latest.nodesDiscovered}</dd>
+					<dd className="font-mono text-foreground/80">
+						{latest.nodesDiscovered.toLocaleString()}
+					</dd>
 					<dt>Edges discovered</dt>
-					<dd className="font-mono">{latest.edgesDiscovered}</dd>
+					<dd className="font-mono text-foreground/80">
+						{latest.edgesDiscovered.toLocaleString()}
+					</dd>
 					<dt>Started</dt>
-					<dd className="font-mono text-xs">
+					<dd className="font-mono text-xs text-foreground/80">
 						{latest.startedAt
 							? new Date(latest.startedAt).toLocaleTimeString()
 							: "—"}
 					</dd>
 					<dt>Finished</dt>
-					<dd className="font-mono text-xs">
+					<dd className="font-mono text-xs text-foreground/80">
 						{latest.finishedAt
 							? new Date(latest.finishedAt).toLocaleTimeString()
 							: "—"}
@@ -109,14 +115,23 @@ export function CrawlStatus() {
 			)}
 
 			{latest?.error && (
-				<p className="rounded bg-destructive/10 p-2 text-xs text-destructive">
+				<p className="rounded-md bg-destructive/10 p-2 text-xs text-destructive">
 					{latest.error}
 				</p>
 			)}
 			{error && (
-				<p className="rounded bg-destructive/10 p-2 text-xs text-destructive">
+				<p className="rounded-md bg-destructive/10 p-2 text-xs text-destructive">
 					{error}
 				</p>
+			)}
+
+			{done && (
+				<Link
+					href="/graph"
+					className="block w-full rounded-md border border-[var(--amethyst)]/40 bg-[var(--amethyst)]/10 px-4 py-2.5 text-center text-sm font-medium text-[var(--amethyst)] transition hover:bg-[var(--amethyst)]/20"
+				>
+					View your graph →
+				</Link>
 			)}
 		</div>
 	);
