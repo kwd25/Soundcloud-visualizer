@@ -1,7 +1,16 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { authUsers, crawlJobs } from "@/lib/db/schema";
-import { computeAllLayouts } from "@/lib/graph";
+import {
+	assignCommunities,
+	assignLayout,
+	buildGraphForOwner,
+	clearOwnerLayout,
+	computeCoListenerEdges,
+	graphToLayoutRows,
+	insertLayout,
+	persistCoListenerEdges,
+} from "@/lib/graph";
 import {
 	collect,
 	SoundCloudClient,
@@ -21,6 +30,8 @@ import {
 /** Defaults — tunable per-event for testing. */
 const DEFAULT_SEED_CAP = 2000;
 const DEFAULT_FAVORITERS_CAP = 200;
+/** Group this many seed tracks per step.run() to keep total step count low. */
+const EXPAND_BATCH_SIZE = 50;
 
 export const crawlOwnerLikes = inngest.createFunction(
 	{
@@ -94,73 +105,128 @@ export const crawlOwnerLikes = inngest.createFunction(
 				return seedTracks.map((t) => t.urn);
 			});
 
-			// ── 2. EXPAND — for each seed track, fetch favoriters ──
+			// ── 2. EXPAND — batched. Each step.run processes a batch of seeds. ──
 			let totalEdges = seedUrns.length * 2;
 			let totalUsers = 0;
+			const batchCount = Math.ceil(seedUrns.length / EXPAND_BATCH_SIZE);
 
-			for (let i = 0; i < seedUrns.length; i++) {
-				const trackUrn = seedUrns[i];
-				if (!trackUrn) continue;
+			for (let b = 0; b < batchCount; b++) {
+				const start = b * EXPAND_BATCH_SIZE;
+				const end = Math.min(start + EXPAND_BATCH_SIZE, seedUrns.length);
+				const batchUrns = seedUrns.slice(start, end);
 
 				const stepResult = await step.run(
-					`expand-${i.toString().padStart(4, "0")}`,
+					`expand-batch-${b.toString().padStart(3, "0")}`,
 					async () => {
 						const client = new SoundCloudClient(ownerUrn);
-						try {
-							const favoriters = await collect<SoundCloudUser>(
-								client,
-								`/tracks/${encodeURIComponent(trackUrn)}/favoriters`,
-								{ max: favoritersCap },
-							);
+						let batchUsers = 0;
+						let batchEdges = 0;
 
-							if (favoriters.length === 0) {
-								return { favoriters: 0, edges: 0 };
+						for (const trackUrn of batchUrns) {
+							try {
+								const favoriters = await collect<SoundCloudUser>(
+									client,
+									`/tracks/${encodeURIComponent(trackUrn)}/favoriters`,
+									{ max: favoritersCap },
+								);
+
+								if (favoriters.length === 0) continue;
+
+								await upsertUsers(favoriters);
+
+								const edgeRows: EdgeRow[] = favoriters.map((u) => ({
+									srcUrn: u.urn,
+									dstUrn: trackUrn,
+									edgeType: "liked" as const,
+								}));
+								await insertEdges(ownerUrn, edgeRows);
+
+								batchUsers += favoriters.length;
+								batchEdges += edgeRows.length;
+							} catch (err) {
+								if (err instanceof SoundCloudError && err.status === 403) {
+									continue;
+								}
+								throw err;
 							}
-
-							await upsertUsers(favoriters);
-
-							const edgeRows: EdgeRow[] = favoriters.map((u) => ({
-								srcUrn: u.urn,
-								dstUrn: trackUrn,
-								edgeType: "liked" as const,
-							}));
-							await insertEdges(ownerUrn, edgeRows);
-
-							return { favoriters: favoriters.length, edges: edgeRows.length };
-						} catch (err) {
-							if (err instanceof SoundCloudError && err.status === 403) {
-								return { favoriters: 0, edges: 0, skipped: true };
-							}
-							throw err;
 						}
+
+						return { users: batchUsers, edges: batchEdges };
 					},
 				);
 
 				totalEdges += stepResult.edges;
-				totalUsers += stepResult.favoriters;
+				totalUsers += stepResult.users;
 
-				if (i % 10 === 9 || i === seedUrns.length - 1) {
-					await db
-						.update(crawlJobs)
-						.set({
-							nodesDiscovered: seedUrns.length + totalUsers,
-							edgesDiscovered: totalEdges,
-						})
-						.where(eq(crawlJobs.id, jobId));
-				}
+				await db
+					.update(crawlJobs)
+					.set({
+						nodesDiscovered: seedUrns.length + totalUsers,
+						edgesDiscovered: totalEdges,
+					})
+					.where(eq(crawlJobs.id, jobId));
 			}
 
-			// ── 3. LAYOUT — projection + Louvain + ForceAtlas2 for both views ──
-			const layoutResult = await step.run("compute-layout", async () => {
-				return await computeAllLayouts(ownerUrn);
+			// ── 3. PROJECTION — track ↔ track co-listener edges ──
+			const projectionResult = await step.run("projection", async () => {
+				const coEdges = await computeCoListenerEdges(ownerUrn, {
+					minWeight: 3,
+				});
+				await persistCoListenerEdges(ownerUrn, coEdges);
+				return { count: coEdges.length };
+			});
+
+			// ── 4. LAYOUT — bipartite ──
+			const bipartiteResult = await step.run("layout-bipartite", async () => {
+				const graph = await buildGraphForOwner({
+					view: "bipartite",
+					ownerUrn,
+					minDegree: 2,
+				});
+				if (graph.order === 0) return { nodes: 0, edges: 0 };
+
+				const { count, modularity } = assignCommunities(graph);
+				assignLayout(graph, 250);
+				const rows = graphToLayoutRows(ownerUrn, "bipartite", graph);
+				await clearOwnerLayout(ownerUrn, "bipartite");
+				await insertLayout(rows);
+				return {
+					nodes: graph.order,
+					edges: graph.size,
+					communities: count,
+					modularity,
+				};
+			});
+
+			// ── 5. LAYOUT — tracks (small graph, can use more iterations) ──
+			const tracksResult = await step.run("layout-tracks", async () => {
+				const graph = await buildGraphForOwner({
+					view: "tracks",
+					ownerUrn,
+				});
+				if (graph.order === 0) return { nodes: 0, edges: 0 };
+
+				const { count, modularity } = assignCommunities(graph);
+				assignLayout(graph, 500);
+				const rows = graphToLayoutRows(ownerUrn, "tracks", graph);
+				await clearOwnerLayout(ownerUrn, "tracks");
+				await insertLayout(rows);
+				return {
+					nodes: graph.order,
+					edges: graph.size,
+					communities: count,
+					modularity,
+				};
 			});
 
 			logger.info("layout complete", {
 				ownerUrn,
-				layoutResult,
+				projection: projectionResult,
+				bipartite: bipartiteResult,
+				tracks: tracksResult,
 			});
 
-			// ── 4. FINALIZE ──
+			// ── 6. FINALIZE ──
 			await step.run("finalize", async () => {
 				const finishedAt = new Date();
 				await db
@@ -185,7 +251,9 @@ export const crawlOwnerLikes = inngest.createFunction(
 				seedTracks: seedUrns.length,
 				totalUsers,
 				totalEdges,
-				layoutResult,
+				projection: projectionResult,
+				bipartite: bipartiteResult,
+				tracks: tracksResult,
 			};
 		} catch (error) {
 			await db
