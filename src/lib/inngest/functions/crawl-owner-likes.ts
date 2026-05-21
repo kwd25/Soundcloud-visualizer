@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { authUsers, crawlJobs } from "@/lib/db/schema";
+import { computeLayoutAndCommunities } from "@/lib/graph";
 import {
 	collect,
 	SoundCloudClient,
@@ -18,8 +19,8 @@ import {
 } from "../persist";
 
 /** Defaults — tunable per-event for testing. */
-const DEFAULT_SEED_CAP = 100;
-const DEFAULT_FAVORITERS_CAP = 100;
+const DEFAULT_SEED_CAP = 500;
+const DEFAULT_FAVORITERS_CAP = 200;
 
 export const crawlOwnerLikes = inngest.createFunction(
 	{
@@ -149,7 +150,17 @@ export const crawlOwnerLikes = inngest.createFunction(
 				}
 			}
 
-			// ── 3. FINALIZE ──
+			// ── 3. LAYOUT — Louvain + ForceAtlas2 ──
+			const layoutResult = await step.run("compute-layout", async () => {
+				return await computeLayoutAndCommunities(ownerUrn);
+			});
+
+			logger.info("layout complete", {
+				ownerUrn,
+				...layoutResult,
+			});
+
+			// ── 4. FINALIZE ──
 			await step.run("finalize", async () => {
 				const finishedAt = new Date();
 				await db
@@ -174,6 +185,8 @@ export const crawlOwnerLikes = inngest.createFunction(
 				seedTracks: seedUrns.length,
 				totalUsers,
 				totalEdges,
+				communities: layoutResult.communities,
+				modularity: layoutResult.modularity,
 			};
 		} catch (error) {
 			await db
