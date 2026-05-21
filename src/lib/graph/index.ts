@@ -60,7 +60,11 @@ export async function computeAllLayouts(
 
 	if (biGraph.order > 0) {
 		const { count, modularity } = assignCommunities(biGraph);
-		assignLayout(biGraph, opts?.iterations?.bipartite ?? 300);
+		assignLayout(biGraph, {
+			iterations: opts?.iterations?.bipartite ?? 150,
+			scalingRatio: 15,
+			adjustSizes: true,
+		});
 		const rows = graphToLayoutRows(ownerUrn, "bipartite", biGraph);
 		await clearOwnerLayout(ownerUrn, "bipartite");
 		await insertLayout(rows);
@@ -89,7 +93,13 @@ export async function computeAllLayouts(
 
 	if (trackGraph.order > 0) {
 		const { count, modularity } = assignCommunities(trackGraph);
-		assignLayout(trackGraph, opts?.iterations?.tracks ?? 500);
+		assignLayout(trackGraph, {
+			iterations: opts?.iterations?.tracks ?? 600,
+			scalingRatio: 50,
+			gravity: 0.5,
+			adjustSizes: true,
+			linLogMode: true,
+		});
 		const rows = graphToLayoutRows(ownerUrn, "tracks", trackGraph);
 		await clearOwnerLayout(ownerUrn, "tracks");
 		await insertLayout(rows);

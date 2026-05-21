@@ -186,7 +186,11 @@ export const crawlOwnerLikes = inngest.createFunction(
 				if (graph.order === 0) return { nodes: 0, edges: 0 };
 
 				const { count, modularity } = assignCommunities(graph);
-				assignLayout(graph, 150);
+				assignLayout(graph, {
+					iterations: 150,
+					scalingRatio: 15,
+					adjustSizes: true,
+				});
 				const rows = graphToLayoutRows(ownerUrn, "bipartite", graph);
 				await clearOwnerLayout(ownerUrn, "bipartite");
 				await insertLayout(rows);
@@ -207,7 +211,13 @@ export const crawlOwnerLikes = inngest.createFunction(
 				if (graph.order === 0) return { nodes: 0, edges: 0 };
 
 				const { count, modularity } = assignCommunities(graph);
-				assignLayout(graph, 500);
+				assignLayout(graph, {
+					iterations: 600,
+					scalingRatio: 50,
+					gravity: 0.5,
+					adjustSizes: true,
+					linLogMode: true,
+				});
 				const rows = graphToLayoutRows(ownerUrn, "tracks", graph);
 				await clearOwnerLayout(ownerUrn, "tracks");
 				await insertLayout(rows);
