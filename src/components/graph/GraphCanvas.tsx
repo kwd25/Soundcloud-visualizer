@@ -19,9 +19,11 @@ interface Props {
 	hiddenCommunities: Set<number>;
 }
 
-// Edges blend into the background; near-bg blue-grey, very thin.
-const EDGE_COLOR = "rgba(110, 130, 165, 0.12)";
-const EDGE_SIZE = 0.15;
+// Edges blend into the background but we keep size larger than strictly
+// needed for visuals so sigma's hit-test gives the click a fair target.
+// Alpha is dropped proportionally so dense regions don't saturate.
+const EDGE_COLOR = "rgba(110, 130, 165, 0.06)";
+const EDGE_SIZE = 1.2;
 
 export function GraphCanvas({
 	data,
@@ -102,7 +104,7 @@ export function GraphCanvas({
 				labelRenderedSizeThreshold: 5,
 				minCameraRatio: 0.05,
 				maxCameraRatio: 20,
-				minEdgeThickness: 0.4,
+				minEdgeThickness: 0.5,
 				enableEdgeEvents: true,
 				defaultDrawNodeHover: drawGlassHover,
 			});
