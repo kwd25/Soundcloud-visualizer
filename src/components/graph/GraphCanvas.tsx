@@ -9,7 +9,11 @@ import {
 	OWNER_NODE_COLOR,
 	SELECTION_COLOR,
 } from "./community-colors";
+import { drawGlassHover } from "./hover-renderer";
 import type { GraphNode, GraphPayload } from "./types";
+
+const EDGE_COLOR = "rgba(255, 255, 255, 0.02)";
+const EDGE_SIZE = 0.25;
 
 interface Props {
 	data: GraphPayload;
@@ -76,8 +80,8 @@ export function GraphCanvas({
 				if (graph.hasNode(e.src) && graph.hasNode(e.dst)) {
 					if (!graph.hasEdge(e.src, e.dst)) {
 						graph.addEdge(e.src, e.dst, {
-							size: 0.4,
-							color: "rgba(255,255,255,0.06)",
+							size: EDGE_SIZE,
+							color: EDGE_COLOR,
 						});
 					}
 				}
@@ -89,14 +93,15 @@ export function GraphCanvas({
 			const sigma = new Sigma(graph, containerRef.current, {
 				renderEdgeLabels: false,
 				defaultNodeColor: "#888",
-				defaultEdgeColor: "rgba(255,255,255,0.05)",
-				labelColor: { color: "rgba(255,255,255,0.85)" },
+				defaultEdgeColor: EDGE_COLOR,
+				labelColor: { color: "rgba(245, 245, 250, 0.9)" },
 				labelSize: 11,
 				labelDensity: 0.07,
 				labelGridCellSize: 80,
 				labelRenderedSizeThreshold: 5,
 				minCameraRatio: 0.05,
 				maxCameraRatio: 20,
+				defaultDrawNodeHover: drawGlassHover,
 			});
 
 			sigma.on("clickNode", ({ node }) => {

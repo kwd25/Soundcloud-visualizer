@@ -116,7 +116,12 @@ export function GraphView() {
 				</p>
 			</header>
 
-			<CommunityLegend data={data} hidden={hidden} onToggle={toggleCommunity} />
+			<CommunityLegend
+				data={data}
+				hidden={hidden}
+				onToggle={toggleCommunity}
+				onSetAll={setHidden}
+			/>
 
 			<InspectorPanel node={selected} onClose={() => setSelected(null)} />
 		</div>

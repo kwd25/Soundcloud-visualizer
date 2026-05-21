@@ -8,9 +8,10 @@ interface Props {
 	data: GraphPayload;
 	hidden: Set<number>;
 	onToggle: (community: number) => void;
+	onSetAll: (next: Set<number>) => void;
 }
 
-export function CommunityLegend({ data, hidden, onToggle }: Props) {
+export function CommunityLegend({ data, hidden, onToggle, onSetAll }: Props) {
 	const sized = useMemo(() => {
 		const counts = new Map<number, number>();
 		for (const n of data.nodes) {
@@ -29,6 +30,10 @@ export function CommunityLegend({ data, hidden, onToggle }: Props) {
 			.map(([id, count]) => ({ id, count, color: palette[id] }));
 	}, [data]);
 
+	const allIds = useMemo(() => sized.map((s) => s.id), [sized]);
+	const allVisible = hidden.size === 0;
+	const allHidden = hidden.size === allIds.length;
+
 	return (
 		<aside className="glass-strong pointer-events-auto absolute bottom-4 left-4 z-10 max-h-[60vh] w-64 overflow-hidden">
 			<div className="border-b border-white/10 px-4 py-3">
@@ -38,8 +43,26 @@ export function CommunityLegend({ data, hidden, onToggle }: Props) {
 				<p className="mt-1 text-xs text-foreground/80">
 					{sized.length} clusters · {data.nodes.length.toLocaleString()} nodes
 				</p>
+				<div className="mt-3 grid grid-cols-2 gap-2">
+					<button
+						type="button"
+						onClick={() => onSetAll(new Set())}
+						disabled={allVisible}
+						className="rounded-md border border-[var(--jade)]/30 bg-[var(--jade)]/10 px-2 py-1 text-[10px] font-medium uppercase tracking-wider text-[var(--jade)] transition hover:bg-[var(--jade)]/20 disabled:opacity-40"
+					>
+						Select all
+					</button>
+					<button
+						type="button"
+						onClick={() => onSetAll(new Set(allIds))}
+						disabled={allHidden}
+						className="rounded-md border border-white/15 bg-white/5 px-2 py-1 text-[10px] font-medium uppercase tracking-wider text-foreground/70 transition hover:bg-white/10 disabled:opacity-40"
+					>
+						Deselect all
+					</button>
+				</div>
 			</div>
-			<div className="max-h-[48vh] space-y-1 overflow-y-auto p-2">
+			<div className="max-h-[44vh] space-y-1 overflow-y-auto p-2">
 				{sized.map(({ id, count, color }) => {
 					const isHidden = hidden.has(id);
 					return (
