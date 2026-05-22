@@ -184,20 +184,67 @@ async function callLLM(
 	return object.communities;
 }
 
-function chunk<T>(arr: T[], n: number): T[][] {
-	const out: T[][] = [];
-	for (let i = 0; i < arr.length; i += n) out.push(arr.slice(i, i + n));
+export function chunkContexts(
+	ctxs: CommunityContext[],
+	size: number = CHUNK_SIZE,
+): CommunityContext[][] {
+	const out: CommunityContext[][] = [];
+	for (let i = 0; i < ctxs.length; i += size) out.push(ctxs.slice(i, i + size));
 	return out;
 }
 
+export function chunkDrafts(
+	drafts: CommunityLabel[],
+	size: number = CHUNK_SIZE,
+): CommunityLabel[][] {
+	const out: CommunityLabel[][] = [];
+	for (let i = 0; i < drafts.length; i += size) {
+		out.push(drafts.slice(i, i + size));
+	}
+	return out;
+}
+
+/**
+ * Label one chunk of communities (pass 1 — draft). Each call here is a
+ * single Anthropic request. Designed to be wrapped in step.run() so
+ * Inngest can retry individual chunks on transient overloads.
+ */
+export async function labelDraftChunk(
+	group: CommunityContext[],
+): Promise<CommunityLabel[]> {
+	if (group.length === 0) return [];
+	return await callLLM(PASS_1_SYSTEM, buildPass1Prompt(group));
+}
+
+/**
+ * Refine one chunk of drafts (pass 2). When called for a chunk that's part
+ * of a bigger set, pass `otherNames` so the AI keeps cross-community
+ * distinctness in mind.
+ */
+export async function labelRefineChunk(
+	group: CommunityLabel[],
+	ctxs: CommunityContext[],
+	otherNames?: Array<{ id: number; name: string }>,
+): Promise<CommunityLabel[]> {
+	if (group.length === 0) return [];
+	const groupIds = new Set(group.map((d) => d.id));
+	const groupCtxs = ctxs.filter((c) => groupIds.has(c.id));
+	let prompt = buildPass2Prompt(groupCtxs, group);
+	if (otherNames && otherNames.length > 0) {
+		prompt += `\n\nFor cross-community distinctness, here are the names of OTHER communities not in this chunk (do not return labels for these — just avoid using overlapping names):\n${otherNames.map((n) => `  #${n.id}: ${n.name}`).join("\n")}`;
+	}
+	return await callLLM(PASS_2_SYSTEM, prompt);
+}
+
+/** Convenience for callers that want the full pipeline in one place
+ * (e.g. tests). The Inngest function should call labelDraftChunk +
+ * labelRefineChunk per step.run() instead for retry granularity. */
 export async function labelDraft(
 	ctxs: CommunityContext[],
 ): Promise<CommunityLabel[]> {
-	if (ctxs.length === 0) return [];
 	const all: CommunityLabel[] = [];
-	for (const group of chunk(ctxs, CHUNK_SIZE)) {
-		const labels = await callLLM(PASS_1_SYSTEM, buildPass1Prompt(group));
-		all.push(...labels);
+	for (const group of chunkContexts(ctxs)) {
+		all.push(...(await labelDraftChunk(group)));
 	}
 	return all;
 }
@@ -207,28 +254,16 @@ export async function labelRefine(
 	drafts: CommunityLabel[],
 ): Promise<CommunityLabel[]> {
 	if (drafts.length === 0) return [];
-	// In refine, we want the AI to see ALL drafts at once for distinctness
-	// checking. So chunk only if absolutely huge — otherwise single call.
 	if (drafts.length <= CHUNK_SIZE * 2) {
-		return await callLLM(PASS_2_SYSTEM, buildPass2Prompt(ctxs, drafts));
+		return await labelRefineChunk(drafts, ctxs);
 	}
-	// Fallback for big sets: chunk but pass the full draft list as cross-
-	// community context so each chunk's revisions stay distinct from
-	// other communities.
 	const all: CommunityLabel[] = [];
-	for (const group of chunk(drafts, CHUNK_SIZE)) {
+	for (const group of chunkDrafts(drafts)) {
 		const groupIds = new Set(group.map((d) => d.id));
-		const groupCtxs = ctxs.filter((c) => groupIds.has(c.id));
-		const refined = await callLLM(
-			PASS_2_SYSTEM,
-			buildPass2Prompt(groupCtxs, group) +
-				`\n\nFor cross-community distinctness, here are the names of OTHER communities you previously drafted (do not return labels for these in this response, but use them to avoid name overlap):\n` +
-				drafts
-					.filter((d) => !groupIds.has(d.id))
-					.map((d) => `  #${d.id}: ${d.name}`)
-					.join("\n"),
-		);
-		all.push(...refined);
+		const others = drafts
+			.filter((d) => !groupIds.has(d.id))
+			.map((d) => ({ id: d.id, name: d.name }));
+		all.push(...(await labelRefineChunk(group, ctxs, others)));
 	}
 	return all;
 }

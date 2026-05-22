@@ -2,9 +2,11 @@ import { eq } from "drizzle-orm";
 import {
 	type CommunityContext,
 	type CommunityLabel,
+	chunkContexts,
+	chunkDrafts,
 	fetchCommunityContexts,
-	labelDraft,
-	labelRefine,
+	labelDraftChunk,
+	labelRefineChunk,
 	persistLabels,
 } from "@/lib/ai/labeler";
 import { db } from "@/lib/db";
@@ -46,7 +48,7 @@ export const crawlOwnerLikes = inngest.createFunction(
 		id: "crawl-owner-likes",
 		name: "Crawl owner's community graph",
 		concurrency: { limit: 1, key: "event.data.ownerUrn" },
-		retries: 1,
+		retries: 3,
 		triggers: [{ event: "crawl/requested" }],
 	},
 	async ({ event, step, logger }) => {
@@ -243,21 +245,38 @@ export const crawlOwnerLikes = inngest.createFunction(
 				return ctxs as CommunityContext[];
 			});
 
-			const drafts: CommunityLabel[] = await step.run(
-				"label-draft",
-				async () => {
-					if (labelContext.length === 0) return [];
-					return await labelDraft(labelContext);
-				},
-			);
+			const draftChunks = chunkContexts(labelContext);
+			const drafts: CommunityLabel[] = [];
+			for (let i = 0; i < draftChunks.length; i++) {
+				const group = draftChunks[i];
+				if (!group) continue;
+				const part = await step.run(
+					`label-draft-${i.toString().padStart(2, "0")}`,
+					async () => labelDraftChunk(group),
+				);
+				drafts.push(...part);
+			}
 
-			const refined: CommunityLabel[] = await step.run(
-				"label-refine",
-				async () => {
-					if (drafts.length === 0) return [];
-					return await labelRefine(labelContext, drafts);
-				},
-			);
+			const refineChunks =
+				drafts.length === 0
+					? []
+					: drafts.length <= 16
+						? [drafts]
+						: chunkDrafts(drafts);
+			const refined: CommunityLabel[] = [];
+			for (let i = 0; i < refineChunks.length; i++) {
+				const group = refineChunks[i];
+				if (!group) continue;
+				const groupIds = new Set(group.map((d) => d.id));
+				const others = drafts
+					.filter((d) => !groupIds.has(d.id))
+					.map((d) => ({ id: d.id, name: d.name }));
+				const part = await step.run(
+					`label-refine-${i.toString().padStart(2, "0")}`,
+					async () => labelRefineChunk(group, labelContext, others),
+				);
+				refined.push(...part);
+			}
 
 			const labelsCount = await step.run("label-persist", async () => {
 				if (refined.length === 0) return 0;
