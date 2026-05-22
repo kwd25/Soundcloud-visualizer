@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { communityPalette } from "./community-colors";
+import { Pane } from "./Pane";
 import {
 	type CommunityLabels,
 	type GraphPayload,
@@ -53,85 +54,93 @@ export function CommunityLegend({
 	const allHidden = visibleIds.every((id) => hidden.has(id));
 
 	return (
-		<aside className="glass-strong pointer-events-auto absolute bottom-4 left-4 z-10 max-h-[70vh] w-72 overflow-hidden">
-			<div className="border-b border-white/10 px-4 py-3">
-				<p className="text-xs uppercase tracking-widest text-muted-foreground">
-					Communities
-				</p>
-				<p className="mt-1 text-xs text-foreground/80">
-					{visible.length}
-					{smallCount > 0 && (
-						<span className="text-muted-foreground">
-							{" "}
-							of {visible.length + smallCount}
-						</span>
-					)}{" "}
-					clusters · {data.nodes.length.toLocaleString()} nodes
-				</p>
-				<div className="mt-3 grid grid-cols-2 gap-2">
-					<button
-						type="button"
-						onClick={() => onSetAll(new Set())}
-						disabled={allVisible}
-						className="rounded-md border border-[var(--jade)]/30 bg-[var(--jade)]/10 px-2 py-1 text-[10px] font-medium uppercase tracking-wider text-[var(--jade)] transition hover:bg-[var(--jade)]/20 disabled:opacity-40"
-					>
-						Select all
-					</button>
-					<button
-						type="button"
-						onClick={() => onSetAll(new Set(visibleIds))}
-						disabled={allHidden}
-						className="rounded-md border border-white/15 bg-white/5 px-2 py-1 text-[10px] font-medium uppercase tracking-wider text-foreground/70 transition hover:bg-white/10 disabled:opacity-40"
-					>
-						Deselect all
-					</button>
-				</div>
-				{smallCount > 0 && (
-					<button
-						type="button"
-						onClick={() => setShowSmall((v) => !v)}
-						className="mt-2 w-full text-left text-[10px] uppercase tracking-wider text-muted-foreground hover:text-foreground"
-					>
-						{showSmall ? "Hide" : "Show"} {smallCount} small (≤
-						{MIN_VISIBLE_COMMUNITY_SIZE})
-					</button>
-				)}
-			</div>
-			<div className="max-h-[52vh] space-y-1 overflow-y-auto p-2">
-				{visible.map(({ id, count, color }) => {
-					const isHidden = hidden.has(id);
-					const label = labels[id];
-					return (
+		<Pane
+			anchor="bl"
+			defaultSize={{ w: 280, h: 520 }}
+			minSize={{ w: 220, h: 280 }}
+			storageKey="graph-legend-pane"
+			className="glass-strong"
+		>
+			<div className="flex h-full w-full flex-col">
+				<div className="shrink-0 border-b border-white/10 px-4 py-3">
+					<p className="text-xs uppercase tracking-widest text-muted-foreground">
+						Communities
+					</p>
+					<p className="mt-1 text-xs text-foreground/80">
+						{visible.length}
+						{smallCount > 0 && (
+							<span className="text-muted-foreground">
+								{" "}
+								of {visible.length + smallCount}
+							</span>
+						)}{" "}
+						clusters · {data.nodes.length.toLocaleString()} nodes
+					</p>
+					<div className="mt-3 grid grid-cols-2 gap-2">
 						<button
 							type="button"
-							key={id}
-							onClick={() => onToggle(id)}
-							title={label?.description ?? undefined}
-							className={`flex w-full items-center gap-3 rounded-md px-2 py-1.5 text-left text-xs transition hover:bg-white/5 ${
-								isHidden ? "opacity-40" : ""
-							}`}
+							onClick={() => onSetAll(new Set())}
+							disabled={allVisible}
+							className="rounded-md border border-[var(--jade)]/30 bg-[var(--jade)]/10 px-2 py-1 text-[10px] font-medium uppercase tracking-wider text-[var(--jade)] transition hover:bg-[var(--jade)]/20 disabled:opacity-40"
 						>
-							<span
-								className="size-3 shrink-0 rounded-full"
-								style={{ backgroundColor: color }}
-							/>
-							<span className="min-w-0 flex-1">
-								<span className="block truncate text-foreground/90">
-									{label?.name ?? `#${id}`}
-								</span>
-								{label?.name && (
-									<span className="block truncate font-mono text-[10px] text-muted-foreground">
-										#{id}
-									</span>
-								)}
-							</span>
-							<span className="font-mono text-muted-foreground">
-								{count.toLocaleString()}
-							</span>
+							Select all
 						</button>
-					);
-				})}
+						<button
+							type="button"
+							onClick={() => onSetAll(new Set(visibleIds))}
+							disabled={allHidden}
+							className="rounded-md border border-white/15 bg-white/5 px-2 py-1 text-[10px] font-medium uppercase tracking-wider text-foreground/70 transition hover:bg-white/10 disabled:opacity-40"
+						>
+							Deselect all
+						</button>
+					</div>
+					{smallCount > 0 && (
+						<button
+							type="button"
+							onClick={() => setShowSmall((v) => !v)}
+							className="mt-2 w-full text-left text-[10px] uppercase tracking-wider text-muted-foreground hover:text-foreground"
+						>
+							{showSmall ? "Hide" : "Show"} {smallCount} small (≤
+							{MIN_VISIBLE_COMMUNITY_SIZE})
+						</button>
+					)}
+				</div>
+				<div className="min-h-0 flex-1 space-y-1 overflow-y-auto p-2">
+					{visible.map(({ id, count, color }) => {
+						const isHidden = hidden.has(id);
+						const label = labels[id];
+						return (
+							<button
+								type="button"
+								key={id}
+								onClick={() => onToggle(id)}
+								title={label?.description ?? undefined}
+								className={`flex w-full items-center gap-3 rounded-md px-2 py-1.5 text-left text-xs transition hover:bg-white/5 ${
+									isHidden ? "opacity-40" : ""
+								}`}
+							>
+								<span
+									className="size-3 shrink-0 rounded-full"
+									style={{ backgroundColor: color }}
+								/>
+								<span className="min-w-0 flex-1">
+									<span className="block truncate text-foreground/90">
+										{label?.name ?? `#${id}`}
+									</span>
+									{label?.name && (
+										<span className="block truncate font-mono text-[10px] text-muted-foreground">
+											#{id}
+										</span>
+									)}
+								</span>
+								<span className="font-mono text-muted-foreground">
+									{count.toLocaleString()}
+								</span>
+							</button>
+						);
+					})}
+				</div>
 			</div>
-		</aside>
+		</Pane>
 	);
 }

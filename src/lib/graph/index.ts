@@ -1,4 +1,4 @@
-import { buildGraphForOwner, type ViewKind } from "./build";
+import { buildGraphForOwner } from "./build";
 import { assignCommunities } from "./community";
 import { assignLayout } from "./layout";
 import { clearOwnerLayout, graphToLayoutRows, insertLayout } from "./persist";

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Pane } from "./Pane";
 import type { CommunityLabels, GraphNode, Selected } from "./types";
 
 interface Props {
@@ -87,83 +88,91 @@ function NodePanel({
 	const label = node.community != null ? labels[node.community] : undefined;
 
 	return (
-		<div className="glass-strong pointer-events-auto absolute right-4 top-4 z-10 w-96 max-w-[calc(100vw-2rem)] overflow-hidden">
-			<HeaderRow
-				label={isTrack ? "Track" : "User"}
-				dotClass={isTrack ? "bg-[var(--jade)]" : "bg-[var(--amethyst)]"}
-				onClose={onClose}
-			/>
+		<Pane
+			anchor="tr"
+			defaultSize={{ w: 400, h: 620 }}
+			minSize={{ w: 320, h: 320 }}
+			storageKey="graph-inspector-pane"
+			className="glass-strong"
+		>
+			<div className="flex h-full w-full flex-col">
+				<HeaderRow
+					label={isTrack ? "Track" : "User"}
+					dotClass={isTrack ? "bg-[var(--jade)]" : "bg-[var(--amethyst)]"}
+					onClose={onClose}
+				/>
 
-			<div className="space-y-4 p-4">
-				{!isTrack && node.avatar_url && (
-					// biome-ignore lint/performance/noImgElement: external SoundCloud avatar
-					<img
-						src={node.avatar_url}
-						alt={node.label ?? ""}
-						className="size-16 rounded-full border border-white/10"
-					/>
-				)}
-
-				<div>
-					<h2 className="break-words text-lg font-semibold leading-tight">
-						{node.label ?? "(no title)"}
-					</h2>
-					{!isTrack && node.followers_count != null && (
-						<p className="mt-1 text-xs text-muted-foreground">
-							{node.followers_count.toLocaleString()} followers
-						</p>
+				<div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
+					{!isTrack && node.avatar_url && (
+						// biome-ignore lint/performance/noImgElement: external SoundCloud avatar
+						<img
+							src={node.avatar_url}
+							alt={node.label ?? ""}
+							className="size-16 rounded-full border border-white/10"
+						/>
 					)}
-					{isTrack && node.likes_count != null && (
-						<p className="mt-1 text-xs text-muted-foreground">
-							{node.likes_count.toLocaleString()} likes on SoundCloud
-						</p>
-					)}
-				</div>
 
-				{isTrack && <SoundCloudWidget track={node} />}
-
-				{node.community != null && (
-					<div className="space-y-1.5">
-						<span className="inline-flex items-center gap-2 rounded-full border border-[var(--amethyst)]/40 bg-[var(--amethyst)]/10 px-3 py-1 text-xs font-medium text-[var(--amethyst)]">
-							<span className="size-1.5 rounded-full bg-[var(--amethyst)]" />
-							{label?.name ?? `Community #${node.community}`}
-						</span>
-						{label?.description && (
-							<p className="text-xs leading-relaxed text-muted-foreground">
-								{label.description}
+					<div>
+						<h2 className="break-words text-lg font-semibold leading-tight">
+							{node.label ?? "(no title)"}
+						</h2>
+						{!isTrack && node.followers_count != null && (
+							<p className="mt-1 text-xs text-muted-foreground">
+								{node.followers_count.toLocaleString()} followers
 							</p>
 						)}
-						{label?.themes && label.themes.length > 0 && (
-							<div className="flex flex-wrap gap-1 pt-1">
-								{label.themes.map((t) => (
-									<span
-										key={t}
-										className="rounded-md border border-white/10 bg-white/5 px-1.5 py-0.5 text-[10px] font-mono text-foreground/70"
-									>
-										{t}
-									</span>
-								))}
-							</div>
+						{isTrack && node.likes_count != null && (
+							<p className="mt-1 text-xs text-muted-foreground">
+								{node.likes_count.toLocaleString()} likes on SoundCloud
+							</p>
 						)}
 					</div>
-				)}
 
-				<div className="break-all text-[10px] font-mono text-muted-foreground/60">
-					{node.urn}
+					{isTrack && <SoundCloudWidget track={node} />}
+
+					{node.community != null && (
+						<div className="space-y-1.5">
+							<span className="inline-flex items-center gap-2 rounded-full border border-[var(--amethyst)]/40 bg-[var(--amethyst)]/10 px-3 py-1 text-xs font-medium text-[var(--amethyst)]">
+								<span className="size-1.5 rounded-full bg-[var(--amethyst)]" />
+								{label?.name ?? `Community #${node.community}`}
+							</span>
+							{label?.description && (
+								<p className="text-xs leading-relaxed text-muted-foreground">
+									{label.description}
+								</p>
+							)}
+							{label?.themes && label.themes.length > 0 && (
+								<div className="flex flex-wrap gap-1 pt-1">
+									{label.themes.map((t) => (
+										<span
+											key={t}
+											className="rounded-md border border-white/10 bg-white/5 px-1.5 py-0.5 text-[10px] font-mono text-foreground/70"
+										>
+											{t}
+										</span>
+									))}
+								</div>
+							)}
+						</div>
+					)}
+
+					<div className="break-all text-[10px] font-mono text-muted-foreground/60">
+						{node.urn}
+					</div>
+
+					{node.permalink_url && (
+						<a
+							href={node.permalink_url}
+							target="_blank"
+							rel="noreferrer noopener"
+							className="inline-flex w-full items-center justify-center rounded-md border border-[var(--jade)]/40 bg-[var(--jade)]/10 px-4 py-2 text-xs font-medium text-[var(--jade)] transition hover:bg-[var(--jade)]/20"
+						>
+							Open on SoundCloud ↗
+						</a>
+					)}
 				</div>
-
-				{node.permalink_url && (
-					<a
-						href={node.permalink_url}
-						target="_blank"
-						rel="noreferrer noopener"
-						className="inline-flex w-full items-center justify-center rounded-md border border-[var(--jade)]/40 bg-[var(--jade)]/10 px-4 py-2 text-xs font-medium text-[var(--jade)] transition hover:bg-[var(--jade)]/20"
-					>
-						Open on SoundCloud ↗
-					</a>
-				)}
 			</div>
-		</div>
+		</Pane>
 	);
 }
 
@@ -210,92 +219,100 @@ function EdgePanel({
 	}, [src.urn, dst.urn, view]);
 
 	return (
-		<div className="glass-strong pointer-events-auto absolute right-4 top-4 z-10 w-96 max-w-[calc(100vw-2rem)] overflow-hidden">
-			<HeaderRow
-				label="Connection"
-				dotClass="bg-[var(--amethyst)]"
-				onClose={onClose}
-			/>
+		<Pane
+			anchor="tr"
+			defaultSize={{ w: 400, h: 620 }}
+			minSize={{ w: 320, h: 320 }}
+			storageKey="graph-inspector-pane"
+			className="glass-strong"
+		>
+			<div className="flex h-full w-full flex-col">
+				<HeaderRow
+					label="Connection"
+					dotClass="bg-[var(--amethyst)]"
+					onClose={onClose}
+				/>
 
-			<div className="space-y-4 p-4">
-				{src.kind === "track" ? (
-					<TrackBlock track={src} />
-				) : (
-					<NodePreview node={src} />
-				)}
-				<div className="border-t border-dashed border-white/15" />
-				{dst.kind === "track" ? (
-					<TrackBlock track={dst} />
-				) : (
-					<NodePreview node={dst} />
-				)}
+				<div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
+					{src.kind === "track" ? (
+						<TrackBlock track={src} />
+					) : (
+						<NodePreview node={src} />
+					)}
+					<div className="border-t border-dashed border-white/15" />
+					{dst.kind === "track" ? (
+						<TrackBlock track={dst} />
+					) : (
+						<NodePreview node={dst} />
+					)}
 
-				<div className="rounded-md border border-white/10 bg-white/5 p-3 text-xs">
-					<p className="text-muted-foreground">
-						{view === "tracks"
-							? "Shared listeners"
-							: weight > 1
-								? "Liked, weight"
-								: "Liked"}
-					</p>
-					<p className="mt-1 font-mono text-lg text-[var(--amethyst)]">
-						{weight.toLocaleString()}
-					</p>
-				</div>
-
-				{view === "tracks" && (
-					<div className="space-y-2">
-						<p className="text-xs uppercase tracking-widest text-muted-foreground">
-							Top common listeners
+					<div className="rounded-md border border-white/10 bg-white/5 p-3 text-xs">
+						<p className="text-muted-foreground">
+							{view === "tracks"
+								? "Shared listeners"
+								: weight > 1
+									? "Liked, weight"
+									: "Liked"}
 						</p>
-						{loading && (
-							<p className="text-xs text-muted-foreground">Loading…</p>
-						)}
-						{error && (
-							<p className="rounded bg-destructive/10 p-2 text-xs text-destructive">
-								{error}
-							</p>
-						)}
-						{detail && detail.common_listeners.length === 0 && !loading && (
-							<p className="text-xs text-muted-foreground">
-								(no overlapping listeners in this crawl)
-							</p>
-						)}
-						{detail && detail.common_listeners.length > 0 && (
-							<ul className="space-y-1.5">
-								{detail.common_listeners.map((u) => (
-									<li key={u.urn}>
-										<a
-											href={u.permalink_url ?? "#"}
-											target="_blank"
-											rel="noreferrer noopener"
-											className="flex items-center gap-2 rounded-md px-1.5 py-1 text-xs text-foreground/85 hover:bg-white/5"
-										>
-											{u.avatar_url && (
-												// biome-ignore lint/performance/noImgElement: external SoundCloud avatar
-												<img
-													src={u.avatar_url}
-													alt=""
-													className="size-6 rounded-full"
-												/>
-											)}
-											<span className="flex-1 truncate">
-												{u.username ?? "(no name)"}
-											</span>
-											{u.followers_count != null && (
-												<span className="font-mono text-muted-foreground">
-													{u.followers_count.toLocaleString()}
-												</span>
-											)}
-										</a>
-									</li>
-								))}
-							</ul>
-						)}
+						<p className="mt-1 font-mono text-lg text-[var(--amethyst)]">
+							{weight.toLocaleString()}
+						</p>
 					</div>
-				)}
+
+					{view === "tracks" && (
+						<div className="space-y-2">
+							<p className="text-xs uppercase tracking-widest text-muted-foreground">
+								Top common listeners
+							</p>
+							{loading && (
+								<p className="text-xs text-muted-foreground">Loading…</p>
+							)}
+							{error && (
+								<p className="rounded bg-destructive/10 p-2 text-xs text-destructive">
+									{error}
+								</p>
+							)}
+							{detail && detail.common_listeners.length === 0 && !loading && (
+								<p className="text-xs text-muted-foreground">
+									(no overlapping listeners in this crawl)
+								</p>
+							)}
+							{detail && detail.common_listeners.length > 0 && (
+								<ul className="space-y-1.5">
+									{detail.common_listeners.map((u) => (
+										<li key={u.urn}>
+											<a
+												href={u.permalink_url ?? "#"}
+												target="_blank"
+												rel="noreferrer noopener"
+												className="flex items-center gap-2 rounded-md px-1.5 py-1 text-xs text-foreground/85 hover:bg-white/5"
+											>
+												{u.avatar_url && (
+													// biome-ignore lint/performance/noImgElement: external SoundCloud avatar
+													<img
+														src={u.avatar_url}
+														alt=""
+														className="size-6 rounded-full"
+													/>
+												)}
+												<span className="flex-1 truncate">
+													{u.username ?? "(no name)"}
+												</span>
+												{u.followers_count != null && (
+													<span className="font-mono text-muted-foreground">
+														{u.followers_count.toLocaleString()}
+													</span>
+												)}
+											</a>
+										</li>
+									))}
+								</ul>
+							)}
+						</div>
+					)}
+				</div>
 			</div>
-		</div>
+		</Pane>
 	);
 }
 
