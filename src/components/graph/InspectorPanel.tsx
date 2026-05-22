@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Pane, type PanePos, type Size } from "./Pane";
+import { Pane, type PanePos } from "./Pane";
 import type { CommunityLabels, GraphNode, Selected } from "./types";
 
 interface Props {
@@ -11,7 +11,6 @@ interface Props {
 	onClose: () => void;
 	pos: PanePos;
 	onPosChange: (next: PanePos) => void;
-	onMeasure?: (size: Size) => void;
 }
 
 interface EdgeDetail {
@@ -32,7 +31,6 @@ export function InspectorPanel({
 	onClose,
 	pos,
 	onPosChange,
-	onMeasure,
 }: Props) {
 	if (!selected) return null;
 
@@ -44,7 +42,6 @@ export function InspectorPanel({
 				onClose={onClose}
 				pos={pos}
 				onPosChange={onPosChange}
-				onMeasure={onMeasure}
 			/>
 		);
 	}
@@ -57,7 +54,6 @@ export function InspectorPanel({
 			onClose={onClose}
 			pos={pos}
 			onPosChange={onPosChange}
-			onMeasure={onMeasure}
 		/>
 	);
 }
@@ -104,14 +100,12 @@ function NodePanel({
 	onClose,
 	pos,
 	onPosChange,
-	onMeasure,
 }: {
 	node: GraphNode;
 	labels: CommunityLabels;
 	onClose: () => void;
 	pos: PanePos;
 	onPosChange: (next: PanePos) => void;
-	onMeasure?: (size: Size) => void;
 }) {
 	const isTrack = node.kind === "track";
 	const label = node.community != null ? labels[node.community] : undefined;
@@ -120,7 +114,6 @@ function NodePanel({
 		<Pane
 			pos={pos}
 			onPosChange={onPosChange}
-			onMeasure={onMeasure}
 			defaultSize={{ w: 400, h: 620 }}
 			minSize={{ w: 320, h: 320 }}
 			storageKey="graph-inspector-pane"
@@ -215,7 +208,6 @@ function EdgePanel({
 	onClose,
 	pos,
 	onPosChange,
-	onMeasure,
 }: {
 	src: GraphNode;
 	dst: GraphNode;
@@ -224,7 +216,6 @@ function EdgePanel({
 	onClose: () => void;
 	pos: PanePos;
 	onPosChange: (next: PanePos) => void;
-	onMeasure?: (size: Size) => void;
 }) {
 	const [detail, setDetail] = useState<EdgeDetail | null>(null);
 	const [loading, setLoading] = useState(false);
@@ -259,7 +250,6 @@ function EdgePanel({
 		<Pane
 			pos={pos}
 			onPosChange={onPosChange}
-			onMeasure={onMeasure}
 			defaultSize={{ w: 400, h: 620 }}
 			minSize={{ w: 320, h: 320 }}
 			storageKey="graph-inspector-pane"

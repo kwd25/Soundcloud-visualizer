@@ -5,30 +5,24 @@ import {
 	type PointerEvent as ReactPointerEvent,
 	useCallback,
 	useEffect,
-	useLayoutEffect,
 	useRef,
 	useState,
 } from "react";
 
 /**
- * Resizable + draggable pane glued to one viewport edge. Position is described
- * as `{ edge, along }` — which viewport edge the pane is touching, and the
- * leading-corner offset (in CSS px) along that edge. On drag release the pane
- * snaps to the nearest viewport edge. Collision resolution between multiple
- * panes lives in the parent (it owns positions of all of them).
+ * Free-floating, draggable, resizable pane. Position is `{x, y}` in CSS pixels
+ * (top-left corner). Drag from any element with `data-drag-handle`. On release
+ * the pane just stays where you put it (clamped to the viewport). 8 resize
+ * handles. No snapping, no edges, no collision avoidance — the parent decides
+ * default positions and the user is responsible for arrangement.
  *
- * Inner content area scrolls when overflow. Sizes persist per `storageKey`.
- * Positions are owned by the parent (controlled via `pos`).
- *
- * For `resizable={false}` panes (e.g. the navbar), size is measured from
- * intrinsic content via ResizeObserver and reported via `onMeasure`.
+ * Size persists per `storageKey` to localStorage. Position is owned by the
+ * parent (controlled via `pos`).
  */
 
-export type Edge = "top" | "right" | "bottom" | "left";
-
 export interface PanePos {
-	edge: Edge;
-	along: number;
+	x: number;
+	y: number;
 }
 
 export interface Size {
@@ -43,9 +37,6 @@ interface Props {
 	minSize?: Size;
 	maxSize?: Size;
 	storageKey?: string;
-	resizable?: boolean;
-	/** Called whenever the pane's measured size changes. */
-	onMeasure?: (size: Size) => void;
 	className?: string;
 	children: ReactNode;
 }
@@ -54,18 +45,7 @@ export const VIEWPORT_PADDING = 16;
 
 type Direction = "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw";
 
-/**
- * Resize handles to show given the anchored edge. The anchored edge itself
- * has no handle (it's glued to the viewport). The opposite edge gets a
- * straight handle, the two perpendicular edges get straight handles, and
- * the two corners adjacent to the opposite edge get corner handles.
- */
-const HANDLES_FOR_EDGE: Record<Edge, Direction[]> = {
-	top: ["s", "e", "w", "se", "sw"],
-	bottom: ["n", "e", "w", "ne", "nw"],
-	left: ["e", "n", "s", "ne", "se"],
-	right: ["w", "n", "s", "nw", "sw"],
-};
+const ALL_HANDLES: Direction[] = ["n", "s", "e", "w", "ne", "nw", "se", "sw"];
 
 const CURSORS: Record<Direction, string> = {
 	n: "ns-resize",
@@ -127,94 +107,24 @@ function writeStoredSize(key: string | undefined, value: Size): void {
 	}
 }
 
-/** Clamp a `along` value into the legal range for the current size + viewport. */
-export function clampAlong(
+/** Clamp a pane's top-left so its whole rect stays inside the viewport padding. */
+export function clampPos(
 	pos: PanePos,
-	size: Size,
-	win: { w: number; h: number },
-): number {
-	if (pos.edge === "top" || pos.edge === "bottom") {
-		return clamp(
-			pos.along,
-			VIEWPORT_PADDING,
-			Math.max(VIEWPORT_PADDING, win.w - size.w - VIEWPORT_PADDING),
-		);
-	}
-	return clamp(
-		pos.along,
-		VIEWPORT_PADDING,
-		Math.max(VIEWPORT_PADDING, win.h - size.h - VIEWPORT_PADDING),
-	);
-}
-
-/** Top-left pixel position for a pane at `pos` with `size` in viewport `win`. */
-export function computePixelPos(
-	pos: PanePos,
-	size: Size,
-	win: { w: number; h: number },
-): { top: number; left: number } {
-	const along = clampAlong(pos, size, win);
-	switch (pos.edge) {
-		case "top":
-			return { top: VIEWPORT_PADDING, left: along };
-		case "bottom":
-			return { top: win.h - VIEWPORT_PADDING - size.h, left: along };
-		case "left":
-			return { top: along, left: VIEWPORT_PADDING };
-		case "right":
-			return { top: along, left: win.w - VIEWPORT_PADDING - size.w };
-	}
-}
-
-/**
- * Snap a drop point to the nearest viewport edge. The pane's center (along
- * that edge) is placed at the pointer.
- */
-export function snapToEdge(
-	pointer: { x: number; y: number },
 	size: Size,
 	win: { w: number; h: number },
 ): PanePos {
-	const d: Record<Edge, number> = {
-		top: pointer.y,
-		bottom: win.h - pointer.y,
-		left: pointer.x,
-		right: win.w - pointer.x,
+	return {
+		x: clamp(
+			pos.x,
+			VIEWPORT_PADDING,
+			Math.max(VIEWPORT_PADDING, win.w - size.w - VIEWPORT_PADDING),
+		),
+		y: clamp(
+			pos.y,
+			VIEWPORT_PADDING,
+			Math.max(VIEWPORT_PADDING, win.h - size.h - VIEWPORT_PADDING),
+		),
 	};
-	let edge: Edge = "top";
-	let best = d.top;
-	for (const e of ["right", "bottom", "left"] as Edge[]) {
-		if (d[e] < best) {
-			best = d[e];
-			edge = e;
-		}
-	}
-	const along =
-		edge === "top" || edge === "bottom"
-			? pointer.x - size.w / 2
-			: pointer.y - size.h / 2;
-	return { edge, along: clampAlong({ edge, along }, size, win) };
-}
-
-export interface Rect {
-	x1: number;
-	y1: number;
-	x2: number;
-	y2: number;
-}
-
-/** Bounding rect (CSS px) for a pane at `pos` with `size` in viewport `win`. */
-export function rectOf(
-	pos: PanePos,
-	size: Size,
-	win: { w: number; h: number },
-): Rect {
-	const { top, left } = computePixelPos(pos, size, win);
-	return { x1: left, y1: top, x2: left + size.w, y2: top + size.h };
-}
-
-export function rectsOverlap(a: Rect, b: Rect): boolean {
-	return !(a.x2 <= b.x1 || b.x2 <= a.x1 || a.y2 <= b.y1 || b.y2 <= a.y1);
 }
 
 export function Pane({
@@ -224,19 +134,14 @@ export function Pane({
 	minSize = { w: 200, h: 100 },
 	maxSize,
 	storageKey,
-	resizable = true,
-	onMeasure,
 	className = "",
 	children,
 }: Props) {
 	const [size, setSize] = useState<Size>(() =>
-		resizable ? readStoredSize(storageKey, defaultSize) : defaultSize,
+		readStoredSize(storageKey, defaultSize),
 	);
 	const sizeRef = useRef(size);
 	sizeRef.current = size;
-	const containerRef = useRef<HTMLDivElement | null>(null);
-	const onMeasureRef = useRef(onMeasure);
-	onMeasureRef.current = onMeasure;
 
 	const [dragDelta, setDragDelta] = useState<{ x: number; y: number } | null>(
 		null,
@@ -256,31 +161,6 @@ export function Pane({
 		return () => window.removeEventListener("resize", onResize);
 	}, []);
 
-	// Non-resizable panes: measure intrinsic content size and report it.
-	useLayoutEffect(() => {
-		if (resizable) return;
-		const el = containerRef.current;
-		if (!el) return;
-		const measure = () => {
-			const w = el.offsetWidth;
-			const h = el.offsetHeight;
-			if (w === 0 && h === 0) return;
-			if (w !== sizeRef.current.w || h !== sizeRef.current.h) {
-				setSize({ w, h });
-				onMeasureRef.current?.({ w, h });
-			}
-		};
-		const ro = new ResizeObserver(measure);
-		ro.observe(el);
-		measure();
-		return () => ro.disconnect();
-	}, [resizable]);
-
-	// Resizable panes: report size to parent whenever it changes.
-	useEffect(() => {
-		if (resizable) onMeasureRef.current?.(size);
-	}, [resizable, size]);
-
 	const computeMax = useCallback((): Size => {
 		return {
 			w: Math.min(
@@ -296,7 +176,6 @@ export function Pane({
 
 	// Clamp size on viewport resize.
 	useEffect(() => {
-		if (!resizable) return;
 		const max = computeMax();
 		setSize((prev) => {
 			const next: Size = {
@@ -309,7 +188,7 @@ export function Pane({
 			}
 			return prev;
 		});
-	}, [computeMax, minSize.w, minSize.h, storageKey, resizable]);
+	}, [computeMax, minSize.w, minSize.h, storageKey]);
 
 	const startResize = useCallback(
 		(dir: Direction) => (e: ReactPointerEvent<HTMLDivElement>) => {
@@ -320,6 +199,7 @@ export function Pane({
 			const startSize = { ...sizeRef.current };
 			const startPos = pos;
 			const max = computeMax();
+			const win = { w: window.innerWidth, h: window.innerHeight };
 
 			document.body.style.userSelect = "none";
 			document.body.style.cursor = CURSORS[dir];
@@ -327,37 +207,33 @@ export function Pane({
 			const onMove = (ev: PointerEvent) => {
 				const dx = ev.clientX - startX;
 				const dy = ev.clientY - startY;
-				let wDelta = 0;
-				let hDelta = 0;
-				if (dir.includes("e")) wDelta = dx;
-				if (dir.includes("w")) wDelta = -dx;
-				if (dir.includes("s")) hDelta = dy;
-				if (dir.includes("n")) hDelta = -dy;
-				const newSize: Size = {
-					w: clamp(startSize.w + wDelta, minSize.w, max.w),
-					h: clamp(startSize.h + hDelta, minSize.h, max.h),
-				};
-				setSize(newSize);
+				let newW = startSize.w;
+				let newH = startSize.h;
+				let newX = startPos.x;
+				let newY = startPos.y;
 
-				// If we're resizing from the side opposite the leading corner (which
-				// `along` tracks), shift `along` to keep the opposite corner visually
-				// fixed.
-				const horizEdge = startPos.edge === "top" || startPos.edge === "bottom";
-				const movesLeading =
-					(horizEdge && dir.includes("w")) || (!horizEdge && dir.includes("n"));
-				if (movesLeading) {
-					const delta = horizEdge
-						? startSize.w - newSize.w
-						: startSize.h - newSize.h;
-					const win = { w: window.innerWidth, h: window.innerHeight };
-					const newAlong = clampAlong(
-						{ edge: startPos.edge, along: startPos.along + delta },
-						newSize,
-						win,
-					);
-					if (newAlong !== startPos.along) {
-						onPosChange?.({ edge: startPos.edge, along: newAlong });
-					}
+				if (dir.includes("e")) {
+					const cap = win.w - VIEWPORT_PADDING - startPos.x;
+					newW = clamp(startSize.w + dx, minSize.w, Math.min(max.w, cap));
+				}
+				if (dir.includes("w")) {
+					const cap = startPos.x + startSize.w - VIEWPORT_PADDING;
+					newW = clamp(startSize.w - dx, minSize.w, Math.min(max.w, cap));
+					newX = startPos.x + (startSize.w - newW);
+				}
+				if (dir.includes("s")) {
+					const cap = win.h - VIEWPORT_PADDING - startPos.y;
+					newH = clamp(startSize.h + dy, minSize.h, Math.min(max.h, cap));
+				}
+				if (dir.includes("n")) {
+					const cap = startPos.y + startSize.h - VIEWPORT_PADDING;
+					newH = clamp(startSize.h - dy, minSize.h, Math.min(max.h, cap));
+					newY = startPos.y + (startSize.h - newH);
+				}
+
+				setSize({ w: newW, h: newH });
+				if (newX !== startPos.x || newY !== startPos.y) {
+					onPosChange?.({ x: newX, y: newY });
 				}
 			};
 
@@ -388,6 +264,7 @@ export function Pane({
 			e.preventDefault();
 			const startX = e.clientX;
 			const startY = e.clientY;
+			const startPos = pos;
 			setDragDelta({ x: 0, y: 0 });
 			document.body.style.userSelect = "none";
 			document.body.style.cursor = "grabbing";
@@ -403,36 +280,34 @@ export function Pane({
 				document.body.style.userSelect = "";
 				document.body.style.cursor = "";
 				setDragDelta(null);
-				const next = snapToEdge(
-					{ x: ev.clientX, y: ev.clientY },
-					sizeRef.current,
-					{ w: window.innerWidth, h: window.innerHeight },
-				);
-				onPosChange(next);
+				const win = { w: window.innerWidth, h: window.innerHeight };
+				const raw: PanePos = {
+					x: startPos.x + (ev.clientX - startX),
+					y: startPos.y + (ev.clientY - startY),
+				};
+				onPosChange(clampPos(raw, sizeRef.current, win));
 			};
 
 			window.addEventListener("pointermove", onMove);
 			window.addEventListener("pointerup", onUp);
 			window.addEventListener("pointercancel", onUp);
 		},
-		[onPosChange],
+		[onPosChange, pos],
 	);
 
-	const pixelPos = computePixelPos(pos, size, winSize);
 	const transform = dragDelta
 		? `translate(${dragDelta.x}px, ${dragDelta.y}px)`
 		: undefined;
 
 	return (
 		<div
-			ref={containerRef}
 			onPointerDown={startDrag}
 			className={`pointer-events-auto absolute ${isDragging ? "z-30" : "z-10"} ${className}`}
 			style={{
-				top: pixelPos.top,
-				left: pixelPos.left,
-				width: resizable ? size.w : undefined,
-				height: resizable ? size.h : undefined,
+				top: pos.y,
+				left: pos.x,
+				width: size.w,
+				height: size.h,
 				transform,
 				touchAction: "none",
 				transition: isDragging ? "none" : "box-shadow 150ms ease-out",
@@ -441,21 +316,16 @@ export function Pane({
 					: undefined,
 			}}
 		>
-			{resizable ? (
-				<div className="h-full w-full overflow-hidden">{children}</div>
-			) : (
-				children
-			)}
-			{resizable &&
-				HANDLES_FOR_EDGE[pos.edge].map((dir) => (
-					<div
-						key={dir}
-						onPointerDown={startResize(dir)}
-						className={`absolute ${handlePosClass(dir)} z-20`}
-						style={{ cursor: CURSORS[dir], touchAction: "none" }}
-						title={`Resize (${dir})`}
-					/>
-				))}
+			<div className="h-full w-full overflow-hidden">{children}</div>
+			{ALL_HANDLES.map((dir) => (
+				<div
+					key={dir}
+					onPointerDown={startResize(dir)}
+					className={`absolute ${handlePosClass(dir)} z-20`}
+					style={{ cursor: CURSORS[dir], touchAction: "none" }}
+					title={`Resize (${dir})`}
+				/>
+			))}
 		</div>
 	);
 }

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { communityPalette } from "./community-colors";
-import { Pane, type PanePos, type Size } from "./Pane";
+import { Pane, type PanePos } from "./Pane";
 import {
 	type CommunityLabels,
 	type GraphPayload,
@@ -17,7 +17,6 @@ interface Props {
 	labels: CommunityLabels;
 	pos: PanePos;
 	onPosChange: (next: PanePos) => void;
-	onMeasure?: (size: Size) => void;
 }
 
 export function CommunityLegend({
@@ -28,7 +27,6 @@ export function CommunityLegend({
 	labels,
 	pos,
 	onPosChange,
-	onMeasure,
 }: Props) {
 	const [showSmall, setShowSmall] = useState(false);
 
@@ -63,7 +61,6 @@ export function CommunityLegend({
 		<Pane
 			pos={pos}
 			onPosChange={onPosChange}
-			onMeasure={onMeasure}
 			defaultSize={{ w: 280, h: 520 }}
 			minSize={{ w: 220, h: 280 }}
 			storageKey="graph-legend-pane"
