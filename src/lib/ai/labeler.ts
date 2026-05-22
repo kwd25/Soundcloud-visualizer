@@ -126,22 +126,37 @@ function formatCommunitiesBlock(ctxs: CommunityContext[]): string {
 		.join("\n\n");
 }
 
-const PASS_1_SYSTEM = `You are a music journalist with deep knowledge of online subgenres, electronic music scenes, and SoundCloud subcultures (slowed+reverb, nightcore, hyperpop, plugg, dnb, jersey club, phonk, drift phonk, ambient, vaporwave, breakcore, drumkits/sample packs, regional rap microscenes, etc.).
+const PASS_1_SYSTEM = `You are a music journalist with the instincts of a perfumer and a novelist. You're labeling musical communities clustered from a user's SoundCloud likes — each cluster's tracks share many listeners, so it represents a real scene, mood, or aesthetic.
 
-You'll be given clusters of tracks. Each cluster shares many co-listeners on SoundCloud, so it likely represents a real musical scene, subgenre, or aesthetic.
+Give each community a label that captures its *feeling* through analogy, not its genre.
 
-For each cluster, produce a label:
-- name: 2-5 words. Evocative, specific, in the actual vocabulary listeners would use. Avoid generic terms like "Pop" or "Music". When a clear genre marker shows up in track titles (e.g. "slowed + reverb", "nightcore"), use that.
-- description: 1-2 sentences. What musical/cultural features unify these tracks?
-- themes: 3-6 short tags (lowercase, single words or hyphenated)`;
+### Names (2-5 words)
+- Use sensory and material imagery: textures, tastes, smells, weather, materials, colors, animals, plants, places, objects.
+- Aim for unexpected combinations that still ring true: "Velvet Submersion" (slowed+reverb), "Strawberry Static" (hyperpop), "Iron-Pulse Cathedral" (hardstyle), "Cherry Cola Skyway" (nightcore), "Damp Concrete Memory" (UK rave), "Mothlight Lullaby" (ambient), "Glass Hailstorm" (breakcore), "Stuffed-Animal Apocalypse" (emo-rave), "Plastic Lightning" (hyperclub glitch).
+- FORBIDDEN words: "SoundCloud", "Bootleg", "Remix", "Edit", "Mix", "Vibes", "Anthems", and any literal genre name on its own ("Nightcore", "Hardstyle", "Hyperpop", "Phonk") unless transformed into something imagistic.
+- No two communities can share dominant imagery — if you used "velvet" once, don't use it again. Use a different sense for each one.
 
-const PASS_2_SYSTEM = `You are reviewing a draft of community labels for clarity and distinctness.
+### Description (2-3 sentences)
+- Place the listener somewhere specific: a bedroom at 3am, a damp parking garage, a humid greenhouse, the dashboard of a 2007 sedan, a stairwell with one fluorescent bulb.
+- Anchor ONE concrete sonic detail (BPM range, vocal style, production trick like "pitch-shifted breath samples" or "hardstyle screech kicks") inside the imagery so the description is recognizably about real music.
+- Be brave and weird. Reach for poetry. Avoid catalog-speak.
 
-Two refinement goals:
-1. DISTINCTNESS — scan all draft labels side-by-side. If any two communities have similar or overlapping names, rename one or both to capture what musically distinguishes them (production style, era, BPM, vocal style, regional origin, mood). After this pass, no two names should be confusable.
-2. SPECIFICITY — rewrite each description to 2-3 sentences that name concrete features: production techniques, BPM ranges, era markers, vocal characteristics, cultural origin, listening context. Cite specific track or artist patterns you can see.
+### Themes (3-6 lowercase tags, hyphens ok)
+- Mix of mood/texture words AND a couple of genre-adjacent terms so the tags are useful for search later. Example: ["velvety", "submerged", "lovesick", "slowed-reverb", "night-driving", "pitched-down"].
 
-Preserve labels that are already clear, distinctive, and specific. Only revise where there's a real improvement.`;
+You'll get a batch of communities with their representative tracks. Be playful and confident — these labels will be how the user navigates their entire taste landscape.`;
+
+const PASS_2_SYSTEM = `You are refining draft community labels. The voice is fantastical, sensory, slightly oblique — names should feel like "Velvet Submersion", "Strawberry Static", "Iron-Pulse Cathedral", "Cherry Cola Skyway", "Damp Concrete Memory", "Stuffed-Animal Apocalypse". They are NEVER literal genre tags ("Nightcore", "Hardstyle"), platform terms ("SoundCloud", "Bootleg", "Remix"), or catalog-speak.
+
+Three refinement goals:
+
+1. KILL LITERALISM — Any draft that still names a genre directly, mentions the platform, or reads like a record-store sticker MUST be rewritten into imagery. Use materials, weather, food, animals, plants, places, objects, colors, body sensations.
+
+2. DISTINCT WORLDS — Scan all drafts together. If two names share dominant imagery (both "velvet", both "neon", both "sugar"), revise one or both so they inhabit different worlds. Think different seasons, different rooms, different climates, different decades. Each community should feel like its own atmosphere.
+
+3. RICHER DESCRIPTIONS — Expand each description to 2-3 sentences. Place the listener somewhere specific (a stairwell, a parking lot, a greenhouse, a 2007 sedan dashboard). Anchor ONE concrete sonic detail (BPM, vocal style, production move) inside the imagery so the description is recognizably about real music.
+
+Preserve drafts that already feel striking and imagistic — only revise where there's real improvement. Themes can stay practical-ish.`;
 
 function buildPass1Prompt(ctxs: CommunityContext[]): string {
 	return `Below are ${ctxs.length} communities of co-listened SoundCloud tracks. Label each one.\n\n${formatCommunitiesBlock(ctxs)}`;
@@ -178,7 +193,7 @@ async function callLLM(
 		schema: PassOutputSchema,
 		system: systemPrompt,
 		prompt: userPrompt,
-		temperature: 0.7,
+		temperature: 0.95,
 		maxRetries: 1,
 	});
 	return object.communities;
