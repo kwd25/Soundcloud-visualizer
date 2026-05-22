@@ -88,6 +88,27 @@ export const layout = pgTable(
 	],
 );
 
+export const communityLabels = pgTable(
+	"community_labels",
+	{
+		ownerUrn: text()
+			.notNull()
+			.references(() => authUsers.soundcloudUrn, { onDelete: "cascade" }),
+		view: text().notNull(),
+		communityId: integer().notNull(),
+		name: text().notNull(),
+		description: text(),
+		themes: text().array().notNull().default(sql`'{}'::text[]`),
+		generatedAt: timestamp({ withTimezone: true })
+			.notNull()
+			.default(sql`now()`),
+	},
+	(t) => [
+		primaryKey({ columns: [t.ownerUrn, t.view, t.communityId] }),
+		index("community_labels_owner_view_idx").on(t.ownerUrn, t.view),
+	],
+);
+
 export const crawlJobs = pgTable(
 	"crawl_jobs",
 	{
@@ -110,6 +131,7 @@ export type AuthUser = typeof authUsers.$inferSelect;
 export type NewAuthUser = typeof authUsers.$inferInsert;
 export type User = typeof users.$inferSelect;
 export type Track = typeof tracks.$inferSelect;
+export type CommunityLabel = typeof communityLabels.$inferSelect;
 export type Edge = typeof edges.$inferSelect;
 export type LayoutNode = typeof layout.$inferSelect;
 export type CrawlJob = typeof crawlJobs.$inferSelect;

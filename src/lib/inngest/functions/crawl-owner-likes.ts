@@ -1,4 +1,12 @@
 import { eq } from "drizzle-orm";
+import {
+	type CommunityContext,
+	type CommunityLabel,
+	fetchCommunityContexts,
+	labelDraft,
+	labelRefine,
+	persistLabels,
+} from "@/lib/ai/labeler";
 import { db } from "@/lib/db";
 import { authUsers, crawlJobs } from "@/lib/db/schema";
 import {
@@ -229,14 +237,46 @@ export const crawlOwnerLikes = inngest.createFunction(
 				};
 			});
 
-			logger.info("layout complete", {
+			// ── 6. AI LABELS (tracks view only for v1) ──
+			const labelContext = await step.run("label-context", async () => {
+				const ctxs = await fetchCommunityContexts(ownerUrn);
+				return ctxs as CommunityContext[];
+			});
+
+			const drafts: CommunityLabel[] = await step.run(
+				"label-draft",
+				async () => {
+					if (labelContext.length === 0) return [];
+					return await labelDraft(labelContext);
+				},
+			);
+
+			const refined: CommunityLabel[] = await step.run(
+				"label-refine",
+				async () => {
+					if (drafts.length === 0) return [];
+					return await labelRefine(labelContext, drafts);
+				},
+			);
+
+			const labelsCount = await step.run("label-persist", async () => {
+				if (refined.length === 0) return 0;
+				return await persistLabels(ownerUrn, "tracks", refined);
+			});
+
+			logger.info("layout + labels complete", {
 				ownerUrn,
 				projection: projectionResult,
 				bipartite: bipartiteResult,
 				tracks: tracksResult,
+				labels: {
+					drafted: drafts.length,
+					refined: refined.length,
+					persisted: labelsCount,
+				},
 			});
 
-			// ── 6. FINALIZE ──
+			// ── 7. FINALIZE ──
 			await step.run("finalize", async () => {
 				const finishedAt = new Date();
 				await db

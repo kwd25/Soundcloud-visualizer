@@ -37,3 +37,11 @@ export type Selected =
 
 /** Hide communities whose member count is ≤ this. Configurable later. */
 export const MIN_VISIBLE_COMMUNITY_SIZE = 5;
+
+export interface CommunityLabel {
+	name: string;
+	description: string | null;
+	themes: string[];
+}
+
+export type CommunityLabels = Record<number, CommunityLabel>;

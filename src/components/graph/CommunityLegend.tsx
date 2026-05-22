@@ -2,16 +2,27 @@
 
 import { useMemo, useState } from "react";
 import { communityPalette } from "./community-colors";
-import { type GraphPayload, MIN_VISIBLE_COMMUNITY_SIZE } from "./types";
+import {
+	type CommunityLabels,
+	type GraphPayload,
+	MIN_VISIBLE_COMMUNITY_SIZE,
+} from "./types";
 
 interface Props {
 	data: GraphPayload;
 	hidden: Set<number>;
 	onToggle: (community: number) => void;
 	onSetAll: (next: Set<number>) => void;
+	labels: CommunityLabels;
 }
 
-export function CommunityLegend({ data, hidden, onToggle, onSetAll }: Props) {
+export function CommunityLegend({
+	data,
+	hidden,
+	onToggle,
+	onSetAll,
+	labels,
+}: Props) {
 	const [showSmall, setShowSmall] = useState(false);
 
 	const { visible, smallCount } = useMemo(() => {
@@ -42,7 +53,7 @@ export function CommunityLegend({ data, hidden, onToggle, onSetAll }: Props) {
 	const allHidden = visibleIds.every((id) => hidden.has(id));
 
 	return (
-		<aside className="glass-strong pointer-events-auto absolute bottom-4 left-4 z-10 max-h-[70vh] w-64 overflow-hidden">
+		<aside className="glass-strong pointer-events-auto absolute bottom-4 left-4 z-10 max-h-[70vh] w-72 overflow-hidden">
 			<div className="border-b border-white/10 px-4 py-3">
 				<p className="text-xs uppercase tracking-widest text-muted-foreground">
 					Communities
@@ -89,11 +100,13 @@ export function CommunityLegend({ data, hidden, onToggle, onSetAll }: Props) {
 			<div className="max-h-[52vh] space-y-1 overflow-y-auto p-2">
 				{visible.map(({ id, count, color }) => {
 					const isHidden = hidden.has(id);
+					const label = labels[id];
 					return (
 						<button
 							type="button"
 							key={id}
 							onClick={() => onToggle(id)}
+							title={label?.description ?? undefined}
 							className={`flex w-full items-center gap-3 rounded-md px-2 py-1.5 text-left text-xs transition hover:bg-white/5 ${
 								isHidden ? "opacity-40" : ""
 							}`}
@@ -102,7 +115,16 @@ export function CommunityLegend({ data, hidden, onToggle, onSetAll }: Props) {
 								className="size-3 shrink-0 rounded-full"
 								style={{ backgroundColor: color }}
 							/>
-							<span className="flex-1 font-mono text-foreground/80">#{id}</span>
+							<span className="min-w-0 flex-1">
+								<span className="block truncate text-foreground/90">
+									{label?.name ?? `#${id}`}
+								</span>
+								{label?.name && (
+									<span className="block truncate font-mono text-[10px] text-muted-foreground">
+										#{id}
+									</span>
+								)}
+							</span>
 							<span className="font-mono text-muted-foreground">
 								{count.toLocaleString()}
 							</span>

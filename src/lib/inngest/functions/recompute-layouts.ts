@@ -1,4 +1,12 @@
 import { eq } from "drizzle-orm";
+import {
+	type CommunityContext,
+	type CommunityLabel,
+	fetchCommunityContexts,
+	labelDraft,
+	labelRefine,
+	persistLabels,
+} from "@/lib/ai/labeler";
 import { db } from "@/lib/db";
 import { crawlJobs } from "@/lib/db/schema";
 import {
@@ -98,11 +106,43 @@ export const recomputeLayouts = inngest.createFunction(
 				};
 			});
 
+			// ── AI labels for the tracks view ──
+			const labelContext = await step.run("label-context", async () => {
+				const ctxs = await fetchCommunityContexts(ownerUrn);
+				return ctxs as CommunityContext[];
+			});
+
+			const drafts: CommunityLabel[] = await step.run(
+				"label-draft",
+				async () => {
+					if (labelContext.length === 0) return [];
+					return await labelDraft(labelContext);
+				},
+			);
+
+			const refined: CommunityLabel[] = await step.run(
+				"label-refine",
+				async () => {
+					if (drafts.length === 0) return [];
+					return await labelRefine(labelContext, drafts);
+				},
+			);
+
+			const labelsCount = await step.run("label-persist", async () => {
+				if (refined.length === 0) return 0;
+				return await persistLabels(ownerUrn, "tracks", refined);
+			});
+
 			logger.info("recompute complete", {
 				ownerUrn,
 				projection,
 				bipartite,
 				tracks,
+				labels: {
+					drafted: drafts.length,
+					refined: refined.length,
+					persisted: labelsCount,
+				},
 			});
 
 			await step.run("finalize", async () => {

@@ -6,6 +6,7 @@ import { CommunityLegend } from "./CommunityLegend";
 import { GraphCanvas } from "./GraphCanvas";
 import { InspectorPanel } from "./InspectorPanel";
 import {
+	type CommunityLabels,
 	type GraphPayload,
 	MIN_VISIBLE_COMMUNITY_SIZE,
 	type Selected,
@@ -30,21 +31,31 @@ export function GraphView() {
 	const [error, setError] = useState<string | null>(null);
 	const [selected, setSelected] = useState<Selected | null>(null);
 	const [hidden, setHidden] = useState<Set<number>>(new Set());
+	const [labels, setLabels] = useState<CommunityLabels>({});
 
 	useEffect(() => {
 		let cancelled = false;
 		setLoading(true);
 		setData(null);
 		setSelected(null);
+		setLabels({});
 		(async () => {
 			try {
-				const res = await fetch(`/api/graph?view=${view}`, {
-					cache: "no-store",
-				});
-				if (!res.ok) throw new Error(`HTTP ${res.status}`);
-				const payload: GraphPayload = await res.json();
+				const [graphRes, labelsRes] = await Promise.all([
+					fetch(`/api/graph?view=${view}`, { cache: "no-store" }),
+					fetch(`/api/communities?view=${view}`, { cache: "no-store" }),
+				]);
+				if (!graphRes.ok) throw new Error(`HTTP ${graphRes.status}`);
+				const payload: GraphPayload = await graphRes.json();
 				if (cancelled) return;
 				setData(payload);
+
+				if (labelsRes.ok) {
+					const labelsJson = (await labelsRes.json()) as {
+						labels: CommunityLabels;
+					};
+					if (!cancelled) setLabels(labelsJson.labels ?? {});
+				}
 
 				// Auto-hide communities at or below the size threshold.
 				const counts = new Map<number, number>();
@@ -163,10 +174,12 @@ export function GraphView() {
 						hidden={hidden}
 						onToggle={toggleCommunity}
 						onSetAll={setHidden}
+						labels={labels}
 					/>
 					<InspectorPanel
 						selected={selected}
 						view={view}
+						labels={labels}
 						onClose={() => setSelected(null)}
 					/>
 				</>

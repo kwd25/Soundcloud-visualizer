@@ -9,6 +9,7 @@ export const env = createEnv({
 		AUTH_SECRET: z.string().min(32),
 		INNGEST_EVENT_KEY: z.string().min(1).optional(),
 		INNGEST_SIGNING_KEY: z.string().min(1).optional(),
+		ANTHROPIC_API_KEY: z.string().min(1),
 	},
 	client: {
 		NEXT_PUBLIC_APP_URL: z.string().url().default("http://localhost:3000"),
@@ -20,6 +21,7 @@ export const env = createEnv({
 		AUTH_SECRET: process.env.AUTH_SECRET,
 		INNGEST_EVENT_KEY: process.env.INNGEST_EVENT_KEY,
 		INNGEST_SIGNING_KEY: process.env.INNGEST_SIGNING_KEY,
+		ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
 		NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
 	},
 	emptyStringAsUndefined: true,

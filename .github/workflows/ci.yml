@@ -37,4 +37,5 @@ jobs:
           SOUNDCLOUD_CLIENT_ID: placeholder
           SOUNDCLOUD_CLIENT_SECRET: placeholder
           AUTH_SECRET: placeholder_secret_that_is_at_least_32_chars_long
+          ANTHROPIC_API_KEY: placeholder
           SKIP_ENV_VALIDATION: "1"

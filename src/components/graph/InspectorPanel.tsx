@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { GraphNode, Selected } from "./types";
+import type { CommunityLabels, GraphNode, Selected } from "./types";
 
 interface Props {
 	selected: Selected | null;
 	view: "tracks" | "bipartite";
+	labels: CommunityLabels;
 	onClose: () => void;
 }
 
@@ -20,11 +21,11 @@ interface EdgeDetail {
 	}>;
 }
 
-export function InspectorPanel({ selected, view, onClose }: Props) {
+export function InspectorPanel({ selected, view, labels, onClose }: Props) {
 	if (!selected) return null;
 
 	if (selected.kind === "node") {
-		return <NodePanel node={selected.node} onClose={onClose} />;
+		return <NodePanel node={selected.node} labels={labels} onClose={onClose} />;
 	}
 	return (
 		<EdgePanel
@@ -75,12 +76,15 @@ function TrackBlock({ track }: { track: GraphNode }) {
 
 function NodePanel({
 	node,
+	labels,
 	onClose,
 }: {
 	node: GraphNode;
+	labels: CommunityLabels;
 	onClose: () => void;
 }) {
 	const isTrack = node.kind === "track";
+	const label = node.community != null ? labels[node.community] : undefined;
 
 	return (
 		<div className="glass-strong pointer-events-auto absolute right-4 top-4 z-10 w-96 max-w-[calc(100vw-2rem)] overflow-hidden">
@@ -119,9 +123,28 @@ function NodePanel({
 				{isTrack && <SoundCloudWidget track={node} />}
 
 				{node.community != null && (
-					<div className="text-xs text-muted-foreground">
-						Community{" "}
-						<span className="font-mono text-foreground">#{node.community}</span>
+					<div className="space-y-1.5">
+						<span className="inline-flex items-center gap-2 rounded-full border border-[var(--amethyst)]/40 bg-[var(--amethyst)]/10 px-3 py-1 text-xs font-medium text-[var(--amethyst)]">
+							<span className="size-1.5 rounded-full bg-[var(--amethyst)]" />
+							{label?.name ?? `Community #${node.community}`}
+						</span>
+						{label?.description && (
+							<p className="text-xs leading-relaxed text-muted-foreground">
+								{label.description}
+							</p>
+						)}
+						{label?.themes && label.themes.length > 0 && (
+							<div className="flex flex-wrap gap-1 pt-1">
+								{label.themes.map((t) => (
+									<span
+										key={t}
+										className="rounded-md border border-white/10 bg-white/5 px-1.5 py-0.5 text-[10px] font-mono text-foreground/70"
+									>
+										{t}
+									</span>
+								))}
+							</div>
+						)}
 					</div>
 				)}
 
