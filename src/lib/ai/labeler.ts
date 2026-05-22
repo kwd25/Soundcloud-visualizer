@@ -6,11 +6,16 @@ import { env } from "@/env";
 import { db } from "@/lib/db";
 import { communityLabels } from "@/lib/db/schema";
 
-const MODEL_ID = "claude-sonnet-4-5-20250929";
+// Haiku for speed — Sonnet's output rate (~50 tok/s) blew the 60s Vercel
+// budget when emitting ~4-5k tokens of structured labels. Haiku is 4-5×
+// faster and handles this pattern-matching task well.
+const MODEL_ID = "claude-haiku-4-5";
 /** Top N tracks per community we include in the prompt context. */
-const TRACKS_PER_COMMUNITY = 15;
+const TRACKS_PER_COMMUNITY = 12;
 /** Skip communities smaller than this when labeling. Their labels stay #N. */
 const MIN_COMMUNITY_SIZE_TO_LABEL = 3;
+/** How many communities to label in a single Anthropic call. */
+const CHUNK_SIZE = 8;
 
 const LabelSchema = z.object({
 	id: z.number().int(),
@@ -174,16 +179,27 @@ async function callLLM(
 		system: systemPrompt,
 		prompt: userPrompt,
 		temperature: 0.7,
-		maxRetries: 2,
+		maxRetries: 1,
 	});
 	return object.communities;
+}
+
+function chunk<T>(arr: T[], n: number): T[][] {
+	const out: T[][] = [];
+	for (let i = 0; i < arr.length; i += n) out.push(arr.slice(i, i + n));
+	return out;
 }
 
 export async function labelDraft(
 	ctxs: CommunityContext[],
 ): Promise<CommunityLabel[]> {
 	if (ctxs.length === 0) return [];
-	return await callLLM(PASS_1_SYSTEM, buildPass1Prompt(ctxs));
+	const all: CommunityLabel[] = [];
+	for (const group of chunk(ctxs, CHUNK_SIZE)) {
+		const labels = await callLLM(PASS_1_SYSTEM, buildPass1Prompt(group));
+		all.push(...labels);
+	}
+	return all;
 }
 
 export async function labelRefine(
@@ -191,7 +207,30 @@ export async function labelRefine(
 	drafts: CommunityLabel[],
 ): Promise<CommunityLabel[]> {
 	if (drafts.length === 0) return [];
-	return await callLLM(PASS_2_SYSTEM, buildPass2Prompt(ctxs, drafts));
+	// In refine, we want the AI to see ALL drafts at once for distinctness
+	// checking. So chunk only if absolutely huge — otherwise single call.
+	if (drafts.length <= CHUNK_SIZE * 2) {
+		return await callLLM(PASS_2_SYSTEM, buildPass2Prompt(ctxs, drafts));
+	}
+	// Fallback for big sets: chunk but pass the full draft list as cross-
+	// community context so each chunk's revisions stay distinct from
+	// other communities.
+	const all: CommunityLabel[] = [];
+	for (const group of chunk(drafts, CHUNK_SIZE)) {
+		const groupIds = new Set(group.map((d) => d.id));
+		const groupCtxs = ctxs.filter((c) => groupIds.has(c.id));
+		const refined = await callLLM(
+			PASS_2_SYSTEM,
+			buildPass2Prompt(groupCtxs, group) +
+				`\n\nFor cross-community distinctness, here are the names of OTHER communities you previously drafted (do not return labels for these in this response, but use them to avoid name overlap):\n` +
+				drafts
+					.filter((d) => !groupIds.has(d.id))
+					.map((d) => `  #${d.id}: ${d.name}`)
+					.join("\n"),
+		);
+		all.push(...refined);
+	}
+	return all;
 }
 
 /** Wipe + replace community_labels for an owner+view. */
