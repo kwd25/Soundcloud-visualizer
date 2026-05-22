@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { CommunityLegend } from "./CommunityLegend";
 import { GraphCanvas } from "./GraphCanvas";
 import { InspectorPanel } from "./InspectorPanel";
+import type { Anchor } from "./Pane";
 import {
 	type CommunityLabels,
 	type GraphPayload,
@@ -13,6 +14,30 @@ import {
 } from "./types";
 
 type ViewKind = "tracks" | "bipartite";
+
+const VALID_ANCHORS: Anchor[] = ["tl", "tr", "bl", "br"];
+
+function loadStoredAnchor(key: string, fallback: Anchor): Anchor {
+	if (typeof window === "undefined") return fallback;
+	try {
+		const stored = localStorage.getItem(key);
+		if (stored && (VALID_ANCHORS as string[]).includes(stored)) {
+			return stored as Anchor;
+		}
+	} catch {
+		// noop
+	}
+	return fallback;
+}
+
+function persistAnchor(key: string, anchor: Anchor): void {
+	if (typeof window === "undefined") return;
+	try {
+		localStorage.setItem(key, anchor);
+	} catch {
+		// noop
+	}
+}
 
 const VIEW_LABEL: Record<ViewKind, string> = {
 	tracks: "Tracks",
@@ -32,6 +57,37 @@ export function GraphView() {
 	const [selected, setSelected] = useState<Selected | null>(null);
 	const [hidden, setHidden] = useState<Set<number>>(new Set());
 	const [labels, setLabels] = useState<CommunityLabels>({});
+	const [legendAnchor, setLegendAnchor] = useState<Anchor>(() =>
+		loadStoredAnchor("graph-legend-anchor", "bl"),
+	);
+	const [inspectorAnchor, setInspectorAnchor] = useState<Anchor>(() =>
+		loadStoredAnchor("graph-inspector-anchor", "tr"),
+	);
+
+	// Drop handlers: snap to nearest corner; swap with the other pane if its corner
+	// is the target. Always persist the new anchor.
+	const handleLegendAnchorChange = useCallback(
+		(next: Anchor) => {
+			if (next === inspectorAnchor && next !== legendAnchor) {
+				setInspectorAnchor(legendAnchor);
+				persistAnchor("graph-inspector-anchor", legendAnchor);
+			}
+			setLegendAnchor(next);
+			persistAnchor("graph-legend-anchor", next);
+		},
+		[inspectorAnchor, legendAnchor],
+	);
+	const handleInspectorAnchorChange = useCallback(
+		(next: Anchor) => {
+			if (next === legendAnchor && next !== inspectorAnchor) {
+				setLegendAnchor(inspectorAnchor);
+				persistAnchor("graph-legend-anchor", inspectorAnchor);
+			}
+			setInspectorAnchor(next);
+			persistAnchor("graph-inspector-anchor", next);
+		},
+		[legendAnchor, inspectorAnchor],
+	);
 
 	useEffect(() => {
 		let cancelled = false;
@@ -175,12 +231,16 @@ export function GraphView() {
 						onToggle={toggleCommunity}
 						onSetAll={setHidden}
 						labels={labels}
+						anchor={legendAnchor}
+						onAnchorChange={handleLegendAnchorChange}
 					/>
 					<InspectorPanel
 						selected={selected}
 						view={view}
 						labels={labels}
 						onClose={() => setSelected(null)}
+						anchor={inspectorAnchor}
+						onAnchorChange={handleInspectorAnchorChange}
 					/>
 				</>
 			)}

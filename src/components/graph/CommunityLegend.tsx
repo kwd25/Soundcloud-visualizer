@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { communityPalette } from "./community-colors";
-import { Pane } from "./Pane";
+import { type Anchor, Pane } from "./Pane";
 import {
 	type CommunityLabels,
 	type GraphPayload,
@@ -15,6 +15,8 @@ interface Props {
 	onToggle: (community: number) => void;
 	onSetAll: (next: Set<number>) => void;
 	labels: CommunityLabels;
+	anchor: Anchor;
+	onAnchorChange: (next: Anchor) => void;
 }
 
 export function CommunityLegend({
@@ -23,6 +25,8 @@ export function CommunityLegend({
 	onToggle,
 	onSetAll,
 	labels,
+	anchor,
+	onAnchorChange,
 }: Props) {
 	const [showSmall, setShowSmall] = useState(false);
 
@@ -55,14 +59,18 @@ export function CommunityLegend({
 
 	return (
 		<Pane
-			anchor="bl"
+			anchor={anchor}
+			onAnchorChange={onAnchorChange}
 			defaultSize={{ w: 280, h: 520 }}
 			minSize={{ w: 220, h: 280 }}
 			storageKey="graph-legend-pane"
 			className="glass-strong"
 		>
 			<div className="flex h-full w-full flex-col">
-				<div className="shrink-0 border-b border-white/10 px-4 py-3">
+				<div
+					data-drag-handle
+					className="shrink-0 cursor-grab border-b border-white/10 px-4 py-3 active:cursor-grabbing"
+				>
 					<p className="text-xs uppercase tracking-widest text-muted-foreground">
 						Communities
 					</p>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Pane } from "./Pane";
+import { type Anchor, Pane } from "./Pane";
 import type { CommunityLabels, GraphNode, Selected } from "./types";
 
 interface Props {
@@ -9,6 +9,8 @@ interface Props {
 	view: "tracks" | "bipartite";
 	labels: CommunityLabels;
 	onClose: () => void;
+	anchor: Anchor;
+	onAnchorChange: (next: Anchor) => void;
 }
 
 interface EdgeDetail {
@@ -22,11 +24,26 @@ interface EdgeDetail {
 	}>;
 }
 
-export function InspectorPanel({ selected, view, labels, onClose }: Props) {
+export function InspectorPanel({
+	selected,
+	view,
+	labels,
+	onClose,
+	anchor,
+	onAnchorChange,
+}: Props) {
 	if (!selected) return null;
 
 	if (selected.kind === "node") {
-		return <NodePanel node={selected.node} labels={labels} onClose={onClose} />;
+		return (
+			<NodePanel
+				node={selected.node}
+				labels={labels}
+				onClose={onClose}
+				anchor={anchor}
+				onAnchorChange={onAnchorChange}
+			/>
+		);
 	}
 	return (
 		<EdgePanel
@@ -35,6 +52,8 @@ export function InspectorPanel({ selected, view, labels, onClose }: Props) {
 			weight={selected.edge.weight}
 			view={view}
 			onClose={onClose}
+			anchor={anchor}
+			onAnchorChange={onAnchorChange}
 		/>
 	);
 }
@@ -79,17 +98,22 @@ function NodePanel({
 	node,
 	labels,
 	onClose,
+	anchor,
+	onAnchorChange,
 }: {
 	node: GraphNode;
 	labels: CommunityLabels;
 	onClose: () => void;
+	anchor: Anchor;
+	onAnchorChange: (next: Anchor) => void;
 }) {
 	const isTrack = node.kind === "track";
 	const label = node.community != null ? labels[node.community] : undefined;
 
 	return (
 		<Pane
-			anchor="tr"
+			anchor={anchor}
+			onAnchorChange={onAnchorChange}
 			defaultSize={{ w: 400, h: 620 }}
 			minSize={{ w: 320, h: 320 }}
 			storageKey="graph-inspector-pane"
@@ -182,12 +206,16 @@ function EdgePanel({
 	weight,
 	view,
 	onClose,
+	anchor,
+	onAnchorChange,
 }: {
 	src: GraphNode;
 	dst: GraphNode;
 	weight: number;
 	view: "tracks" | "bipartite";
 	onClose: () => void;
+	anchor: Anchor;
+	onAnchorChange: (next: Anchor) => void;
 }) {
 	const [detail, setDetail] = useState<EdgeDetail | null>(null);
 	const [loading, setLoading] = useState(false);
@@ -220,7 +248,8 @@ function EdgePanel({
 
 	return (
 		<Pane
-			anchor="tr"
+			anchor={anchor}
+			onAnchorChange={onAnchorChange}
 			defaultSize={{ w: 400, h: 620 }}
 			minSize={{ w: 320, h: 320 }}
 			storageKey="graph-inspector-pane"
@@ -365,7 +394,10 @@ function HeaderRow({
 	onClose: () => void;
 }) {
 	return (
-		<div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+		<div
+			data-drag-handle
+			className="flex cursor-grab items-center justify-between border-b border-white/10 px-4 py-3 active:cursor-grabbing"
+		>
 			<div className="flex items-center gap-2">
 				<span
 					className={`size-2 rounded-full ${dotClass} shadow-[0_0_8px_currentColor]`}

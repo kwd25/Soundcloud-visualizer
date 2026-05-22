@@ -10,13 +10,13 @@ import {
 } from "react";
 
 /**
- * Resizable pane anchored to a viewport corner. Always touches at least two
- * viewport edges (the anchor edges), so it never floats free — that's the
- * "snap to edge" guarantee. Resize handles are placed on the corner opposite
- * the anchor plus the two adjacent edges (the other corners/edges belong to
- * anchored sides and would just move the whole pane).
+ * Resizable + draggable pane anchored to a viewport corner. Always touches
+ * at least two viewport edges (the anchor edges) — that's the snap-to-edge
+ * guarantee. Drag from any element with `data-drag-handle`; on release the
+ * pane snaps to the nearest viewport corner. Collisions with other panes
+ * are resolved by the parent via `onAnchorChange` (typically a swap).
  *
- * Inner content area is scrollable when it overflows. Sizes persist per
+ * Inner content area scrolls when overflow. Sizes + anchor persist per
  * `storageKey` to localStorage.
  */
 
@@ -29,11 +29,11 @@ interface Size {
 
 interface Props {
 	anchor: Anchor;
+	onAnchorChange?: (next: Anchor) => void;
 	defaultSize: Size;
 	minSize: Size;
 	maxSize?: Size;
 	storageKey?: string;
-	/** Extra classes on the outer pane (glass treatment, etc.). */
 	className?: string;
 	children: ReactNode;
 }
@@ -95,12 +95,17 @@ function clamp(v: number, min: number, max: number): number {
 	return Math.max(min, Math.min(max, v));
 }
 
-function readStoredSize(key: string | undefined, fallback: Size): Size {
+interface Stored {
+	w: number;
+	h: number;
+}
+
+function readStored(key: string | undefined, fallback: Stored): Stored {
 	if (!key || typeof window === "undefined") return fallback;
 	try {
 		const raw = localStorage.getItem(key);
 		if (!raw) return fallback;
-		const parsed = JSON.parse(raw) as Partial<Size>;
+		const parsed = JSON.parse(raw) as Partial<Stored>;
 		if (typeof parsed.w === "number" && typeof parsed.h === "number") {
 			return { w: parsed.w, h: parsed.h };
 		}
@@ -110,17 +115,34 @@ function readStoredSize(key: string | undefined, fallback: Size): Size {
 	return fallback;
 }
 
-function writeStoredSize(key: string | undefined, size: Size): void {
+function writeStored(key: string | undefined, value: Stored): void {
 	if (!key || typeof window === "undefined") return;
 	try {
-		localStorage.setItem(key, JSON.stringify(size));
+		localStorage.setItem(key, JSON.stringify(value));
 	} catch {
 		// noop
 	}
 }
 
+/**
+ * Return the viewport corner nearest to (x, y) in CSS pixels. Used after a
+ * drag release to snap the pane to a corner.
+ */
+export function nearestCorner(x: number, y: number): Anchor {
+	if (typeof window === "undefined") return "tl";
+	const w = window.innerWidth;
+	const h = window.innerHeight;
+	const left = x < w / 2;
+	const top = y < h / 2;
+	if (top && left) return "tl";
+	if (top && !left) return "tr";
+	if (!top && left) return "bl";
+	return "br";
+}
+
 export function Pane({
 	anchor,
+	onAnchorChange,
 	defaultSize,
 	minSize,
 	maxSize,
@@ -129,10 +151,14 @@ export function Pane({
 	children,
 }: Props) {
 	const [size, setSize] = useState<Size>(() =>
-		readStoredSize(storageKey, defaultSize),
+		readStored(storageKey, defaultSize),
 	);
 	const sizeRef = useRef(size);
 	sizeRef.current = size;
+	const [dragDelta, setDragDelta] = useState<{ x: number; y: number } | null>(
+		null,
+	);
+	const isDragging = dragDelta !== null;
 
 	const computeMax = useCallback((): Size => {
 		const winW = typeof window === "undefined" ? 1920 : window.innerWidth;
@@ -149,7 +175,6 @@ export function Pane({
 		};
 	}, [maxSize?.w, maxSize?.h]);
 
-	// On viewport resize, clamp size so the pane never exceeds visible area.
 	useEffect(() => {
 		const onResize = () => {
 			const max = computeMax();
@@ -159,7 +184,7 @@ export function Pane({
 					h: clamp(prev.h, minSize.h, max.h),
 				};
 				if (next.w !== prev.w || next.h !== prev.h) {
-					writeStoredSize(storageKey, next);
+					writeStored(storageKey, next);
 					return next;
 				}
 				return prev;
@@ -190,11 +215,10 @@ export function Pane({
 				if (dir.includes("w")) wDelta = -dx;
 				if (dir.includes("s")) hDelta = dy;
 				if (dir.includes("n")) hDelta = -dy;
-				const next: Size = {
+				setSize({
 					w: clamp(startSize.w + wDelta, minSize.w, max.w),
 					h: clamp(startSize.h + hDelta, minSize.h, max.h),
-				};
-				setSize(next);
+				});
 			};
 
 			const onUp = () => {
@@ -203,7 +227,7 @@ export function Pane({
 				window.removeEventListener("pointercancel", onUp);
 				document.body.style.userSelect = "";
 				document.body.style.cursor = "";
-				writeStoredSize(storageKey, sizeRef.current);
+				writeStored(storageKey, sizeRef.current);
 			};
 
 			window.addEventListener("pointermove", onMove);
@@ -213,10 +237,60 @@ export function Pane({
 		[computeMax, minSize.w, minSize.h, storageKey],
 	);
 
+	const startDrag = useCallback(
+		(e: ReactPointerEvent<HTMLDivElement>) => {
+			if (!onAnchorChange) return;
+			const target = e.target as HTMLElement;
+			// Only start drag if the pointer is inside a [data-drag-handle] element.
+			if (!target.closest("[data-drag-handle]")) return;
+			// Don't drag from interactive elements that bubble out of a drag handle.
+			if (target.closest("button, a, input, textarea, select")) return;
+			e.preventDefault();
+			const startX = e.clientX;
+			const startY = e.clientY;
+			setDragDelta({ x: 0, y: 0 });
+			document.body.style.userSelect = "none";
+			document.body.style.cursor = "grabbing";
+
+			const onMove = (ev: PointerEvent) => {
+				setDragDelta({ x: ev.clientX - startX, y: ev.clientY - startY });
+			};
+
+			const onUp = (ev: PointerEvent) => {
+				window.removeEventListener("pointermove", onMove);
+				window.removeEventListener("pointerup", onUp);
+				window.removeEventListener("pointercancel", onUp);
+				document.body.style.userSelect = "";
+				document.body.style.cursor = "";
+				setDragDelta(null);
+				onAnchorChange(nearestCorner(ev.clientX, ev.clientY));
+			};
+
+			window.addEventListener("pointermove", onMove);
+			window.addEventListener("pointerup", onUp);
+			window.addEventListener("pointercancel", onUp);
+		},
+		[onAnchorChange],
+	);
+
+	const transform = dragDelta
+		? `translate(${dragDelta.x}px, ${dragDelta.y}px)`
+		: undefined;
+
 	return (
 		<div
-			className={`pointer-events-auto absolute ${ANCHOR_CLASSES[anchor]} z-10 ${className}`}
-			style={{ width: size.w, height: size.h, touchAction: "none" }}
+			onPointerDown={startDrag}
+			className={`pointer-events-auto absolute ${ANCHOR_CLASSES[anchor]} ${isDragging ? "z-30" : "z-10"} ${className}`}
+			style={{
+				width: size.w,
+				height: size.h,
+				transform,
+				touchAction: "none",
+				transition: isDragging ? "none" : "box-shadow 150ms ease-out",
+				boxShadow: isDragging
+					? "0 24px 64px oklch(0.05 0.012 264 / 70%), inset 0 1px 0 oklch(0.97 0.003 264 / 14%)"
+					: undefined,
+			}}
 		>
 			<div className="h-full w-full overflow-hidden">{children}</div>
 			{ANCHOR_HANDLES[anchor].map((dir) => (
