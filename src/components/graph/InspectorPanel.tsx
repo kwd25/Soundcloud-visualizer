@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { type Anchor, Pane } from "./Pane";
+import { Pane, type PanePos, type Size } from "./Pane";
 import type { CommunityLabels, GraphNode, Selected } from "./types";
 
 interface Props {
@@ -9,8 +9,9 @@ interface Props {
 	view: "tracks" | "bipartite";
 	labels: CommunityLabels;
 	onClose: () => void;
-	anchor: Anchor;
-	onAnchorChange: (next: Anchor) => void;
+	pos: PanePos;
+	onPosChange: (next: PanePos) => void;
+	onMeasure?: (size: Size) => void;
 }
 
 interface EdgeDetail {
@@ -29,8 +30,9 @@ export function InspectorPanel({
 	view,
 	labels,
 	onClose,
-	anchor,
-	onAnchorChange,
+	pos,
+	onPosChange,
+	onMeasure,
 }: Props) {
 	if (!selected) return null;
 
@@ -40,8 +42,9 @@ export function InspectorPanel({
 				node={selected.node}
 				labels={labels}
 				onClose={onClose}
-				anchor={anchor}
-				onAnchorChange={onAnchorChange}
+				pos={pos}
+				onPosChange={onPosChange}
+				onMeasure={onMeasure}
 			/>
 		);
 	}
@@ -52,8 +55,9 @@ export function InspectorPanel({
 			weight={selected.edge.weight}
 			view={view}
 			onClose={onClose}
-			anchor={anchor}
-			onAnchorChange={onAnchorChange}
+			pos={pos}
+			onPosChange={onPosChange}
+			onMeasure={onMeasure}
 		/>
 	);
 }
@@ -98,22 +102,25 @@ function NodePanel({
 	node,
 	labels,
 	onClose,
-	anchor,
-	onAnchorChange,
+	pos,
+	onPosChange,
+	onMeasure,
 }: {
 	node: GraphNode;
 	labels: CommunityLabels;
 	onClose: () => void;
-	anchor: Anchor;
-	onAnchorChange: (next: Anchor) => void;
+	pos: PanePos;
+	onPosChange: (next: PanePos) => void;
+	onMeasure?: (size: Size) => void;
 }) {
 	const isTrack = node.kind === "track";
 	const label = node.community != null ? labels[node.community] : undefined;
 
 	return (
 		<Pane
-			anchor={anchor}
-			onAnchorChange={onAnchorChange}
+			pos={pos}
+			onPosChange={onPosChange}
+			onMeasure={onMeasure}
 			defaultSize={{ w: 400, h: 620 }}
 			minSize={{ w: 320, h: 320 }}
 			storageKey="graph-inspector-pane"
@@ -206,16 +213,18 @@ function EdgePanel({
 	weight,
 	view,
 	onClose,
-	anchor,
-	onAnchorChange,
+	pos,
+	onPosChange,
+	onMeasure,
 }: {
 	src: GraphNode;
 	dst: GraphNode;
 	weight: number;
 	view: "tracks" | "bipartite";
 	onClose: () => void;
-	anchor: Anchor;
-	onAnchorChange: (next: Anchor) => void;
+	pos: PanePos;
+	onPosChange: (next: PanePos) => void;
+	onMeasure?: (size: Size) => void;
 }) {
 	const [detail, setDetail] = useState<EdgeDetail | null>(null);
 	const [loading, setLoading] = useState(false);
@@ -248,8 +257,9 @@ function EdgePanel({
 
 	return (
 		<Pane
-			anchor={anchor}
-			onAnchorChange={onAnchorChange}
+			pos={pos}
+			onPosChange={onPosChange}
+			onMeasure={onMeasure}
 			defaultSize={{ w: 400, h: 620 }}
 			minSize={{ w: 320, h: 320 }}
 			storageKey="graph-inspector-pane"
